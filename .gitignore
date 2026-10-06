@@ -1,0 +1,9 @@
+# Generated ROS build files
+/build/
+/install/
+/log/
+
+# Python generated files and virtual environment
+__pycache__/
+*.pyc
+/.venv/
