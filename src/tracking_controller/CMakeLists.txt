@@ -42,6 +42,14 @@ install(TARGETS tracking_controller_node
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
+  find_package(ament_cmake_ros REQUIRED)
+  find_package(launch_testing_ament_cmake REQUIRED)
+
+  add_launch_test(
+    test/test_tracking_controller_launch.py
+    TIMEOUT 30
+    RUNNER "${ament_cmake_ros_DIR}/run_test_isolated.py"
+  )
 
   ament_add_gtest(controller_tests test/controller_tests.cpp)
 
