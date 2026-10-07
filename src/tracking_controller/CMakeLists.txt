@@ -11,6 +11,7 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(drone_interfaces REQUIRED)
 
 add_executable(controller_demo src/controller_demo.cpp)
 
@@ -19,6 +20,23 @@ target_include_directories(controller_demo PRIVATE
 )
 
 install(TARGETS controller_demo
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+add_executable(tracking_controller_node
+  src/tracking_controller_node.cpp
+)
+
+target_include_directories(tracking_controller_node PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+ament_target_dependencies(tracking_controller_node
+  rclcpp
+  drone_interfaces
+)
+
+install(TARGETS tracking_controller_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

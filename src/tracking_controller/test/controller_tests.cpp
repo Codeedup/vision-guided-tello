@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 #include "tracking_controller/controller.hpp"
 #include <limits>
+#include <cmath>
+#include "tracking_controller/target_safety.hpp"
 
 TEST(Controller, HandRightRequestsRight)
 {
@@ -138,4 +140,102 @@ TEST(Controller, ImageBoundaryValuesRemainValid)
 
     EXPECT_DOUBLE_EQ(command.lateral, 10.0);
     EXPECT_DOUBLE_EQ(command.vertical, 10.0);
+}
+
+TEST(TargetSafety, ValidTimestampFormsAreAccepted)
+{
+    EXPECT_TRUE(tracking_controller::is_valid_stamp(1, 0));
+    EXPECT_TRUE(tracking_controller::is_valid_stamp(0, 1));
+    EXPECT_TRUE(
+        tracking_controller::is_valid_stamp(1, 999999999U));
+}
+
+TEST(TargetSafety, MissingTimestampIsRejected)
+{
+    EXPECT_FALSE(tracking_controller::is_valid_stamp(0, 0));
+}
+
+TEST(TargetSafety, MalformedTimestampIsRejected)
+{
+    EXPECT_FALSE(tracking_controller::is_valid_stamp(-1, 0));
+    EXPECT_FALSE(
+        tracking_controller::is_valid_stamp(1, 1000000000U));
+}
+
+TEST(TargetSafety, AgesBelowTimeoutAreFresh)
+{
+    EXPECT_TRUE(tracking_controller::is_fresh_age(0.0));
+    EXPECT_TRUE(tracking_controller::is_fresh_age(0.1));
+
+    const double just_before_timeout =
+        std::nextafter(0.25, 0.0);
+
+    EXPECT_TRUE(
+        tracking_controller::is_fresh_age(just_before_timeout));
+}
+
+TEST(TargetSafety, ExactTimeoutAndOlderAgesAreRejected)
+{
+    EXPECT_FALSE(tracking_controller::is_fresh_age(0.25));
+    EXPECT_FALSE(tracking_controller::is_fresh_age(0.3));
+}
+
+TEST(TargetSafety, FutureObservationIsRejected)
+{
+    EXPECT_FALSE(tracking_controller::is_fresh_age(-0.001));
+}
+
+TEST(TargetSafety, NonFiniteAgesAreRejected)
+{
+    const double nan =
+        std::numeric_limits<double>::quiet_NaN();
+
+    const double infinity =
+        std::numeric_limits<double>::infinity();
+
+    EXPECT_FALSE(tracking_controller::is_fresh_age(nan));
+    EXPECT_FALSE(tracking_controller::is_fresh_age(infinity));
+    EXPECT_FALSE(tracking_controller::is_fresh_age(-infinity));
+}
+
+TEST(TargetSafety, FreshSourceAndReceiptDoNotExpire)
+{
+    EXPECT_FALSE(
+        tracking_controller::target_expired(0.1, 0.1));
+}
+
+TEST(TargetSafety, OldSourceExpiresDespiteRecentReceipt)
+{
+    EXPECT_TRUE(
+        tracking_controller::target_expired(0.25, 0.01));
+}
+
+TEST(TargetSafety, ReceiptTimeoutExpiresDespiteFrozenSourceClock)
+{
+    EXPECT_TRUE(
+        tracking_controller::target_expired(0.0, 0.25));
+}
+
+TEST(TargetSafety, NegativeClockAgesCauseExpiry)
+{
+    EXPECT_TRUE(
+        tracking_controller::target_expired(-0.01, 0.1));
+
+    EXPECT_TRUE(
+        tracking_controller::target_expired(0.1, -0.01));
+}
+
+TEST(TargetSafety, NonFiniteClockAgesCauseExpiry)
+{
+    const double nan =
+        std::numeric_limits<double>::quiet_NaN();
+
+    const double infinity =
+        std::numeric_limits<double>::infinity();
+
+    EXPECT_TRUE(
+        tracking_controller::target_expired(nan, 0.1));
+
+    EXPECT_TRUE(
+        tracking_controller::target_expired(0.1, infinity));
 }
