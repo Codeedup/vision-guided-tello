@@ -38,8 +38,30 @@ results were not supplied. Do not add 30 to 122.
 The implementation was saved as commit
 `9bffc54cab7db46dae0b3cb30e686a3196c065c4` on `feature/image-plane-mock`,
 with [draft PR #1](https://github.com/Codeedup/vision-guided-tello/pull/1).
-Next checkpoint: manually launch the static mock, explicitly enable autonomy,
-and observe centering. That demonstration has not yet been reported.
+The user then ran the static mock and supplied a settled-state log fragment:
+
+| Observed field | Value |
+|---|---|
+| `consumer_mode` | `TRACKING` |
+| `lateral`, `vertical` | 0.0, 0.0 |
+| `apparent_velocity_x` | 3.400182564048245e-43 |
+| `apparent_velocity_up` | 1.5719769373950042e-44 |
+| `mock_terminal` | false |
+| `captured`, `delivered`, `pending` | 678, 677, 1 |
+
+This matches the expected settled static behavior: tracking remains permitted,
+commands are neutral and residual response velocities are effectively zero.
+The fragment also includes an error value -0.06529867090522712, within the 0.08
+dead zone, but its field label and the other axis were omitted. The full
+trajectory was not supplied; do not treat this fragment alone as an independent
+measurement of both-axis convergence. Automated checks provide the broader
+convergence and fault evidence.
+
+Point 3 implementation and user-reported WSL validation are complete for this
+software-only milestone. Latest reported interactive state is still enabled
+tracking; a subsequent manual takeover/shutdown has not yet been reported.
+Next milestone: design and implement webcam perception while motion remains
+simulated, with the feedback limitation below addressed explicitly.
 
 No existing controller, supervisor, message, or test was changed. No SDK,
 network socket, takeoff, real landing command, or aircraft connection was added.
@@ -310,8 +332,8 @@ payload. The simulation omits attitude, yaw, distance changes, perspective,
 occlusion geometry, motor dynamics and external disturbances.
 
 The WSL build, mock suite and existing behavior regressions are reported passing
-as recorded above. Keep their actual test reports for the engineering record;
-the manual static demonstration is the next check. The following milestone is
+as recorded above. The manual static sample matches expected settled behavior.
+Keep the actual test reports for the engineering record. The next milestone is
 webcam OpenCV/MediaPipe perception with motion still simulated. Replacing the
 synthetic observations requires an explicit feedback design: a live stationary
 webcam does not move in response to mock drone commands. Do not run two
