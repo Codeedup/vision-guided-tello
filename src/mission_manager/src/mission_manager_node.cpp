@@ -11,6 +11,7 @@
 
 #include "std_srvs/srv/set_bool.hpp"
 #include "std_srvs/srv/trigger.hpp"
+#include "drone_interfaces/msg/approved_command.hpp"
 
 class MissionManager : public rclcpp::Node
 {
@@ -18,6 +19,8 @@ public:
     MissionManager()
         : Node("mission_manager")
     {
+        approved_publisher_ = create_publisher<Approved>(
+             "approved_command", rclcpp::QoS(1));
         subscription_ = create_subscription<Candidate>(
             "candidate_command",
             rclcpp::QoS(1),
@@ -28,10 +31,7 @@ public:
 
         watchdog_ = create_wall_timer(
             std::chrono::milliseconds(20),
-            [this]()
-            {
-                update_safety();
-            });
+             [this]() { publish_approved_command(); });
 
                     autonomy_service_ = create_service<SetAutonomy>(
             "~/set_autonomy",
@@ -50,6 +50,7 @@ public:
                     response->message =
                         "Landing request latched; explicit manual "
                         "takeover is required.";
+                    publish_approved_command();
                     return;
                 }
 
@@ -78,7 +79,7 @@ public:
 
                 
 
-                update_safety();
+                publish_approved_command();
                 response->success = true;
             });
 
@@ -92,7 +93,7 @@ public:
 
                 supervisor_.manual_takeover();
                 clear_input();
-                update_safety();
+                publish_approved_command();
 
                 response->success = true;
                 response->message =
@@ -106,6 +107,7 @@ public:
 
 private:
     using Candidate = drone_interfaces::msg::CandidateCommand;
+    using Approved = drone_interfaces::msg::ApprovedCommand;
     using SteadyClock = std::chrono::steady_clock;
 
     using SetAutonomy = std_srvs::srv::SetBool;
@@ -114,6 +116,7 @@ private:
     mission_manager::Supervisor supervisor_;
 
     rclcpp::Subscription<Candidate>::SharedPtr subscription_;
+    rclcpp::Publisher<Approved>::SharedPtr approved_publisher_;
     rclcpp::TimerBase::SharedPtr watchdog_;
 
     rclcpp::Service<SetAutonomy>::SharedPtr autonomy_service_;
@@ -245,15 +248,51 @@ private:
         }
     }
 
+        void publish_approved_command()
+    {
+        // Recheck deadlines and candidate freshness before publishing.
+        update_safety();
+
+        const auto decision = supervisor_.decision();
+
+        Approved command{};
+        command.header.stamp = now();
+
+        if (have_candidate_)
+        {
+            command.source_header = last_candidate_.header;
+        }
+
+        command.autonomy_enabled =
+            decision.state != mission_manager::AutonomyState::DISABLED;
+
+        command.tracking_allowed =
+            decision.allow_tracking &&
+            have_candidate_ &&
+            candidate_usable_;
+
+        command.request_land = decision.request_land;
+
+        // Neutral unless policy AND candidate validation permit movement.
+        command.lateral = 0.0;
+        command.vertical = 0.0;
+
+        if (command.tracking_allowed)
+        {
+            command.lateral = last_candidate_.lateral;
+            command.vertical = last_candidate_.vertical;
+        }
+
+        approved_publisher_->publish(command);
+    }
+
     void reject_candidate()
     {
         candidate_usable_ = false;
-
-        // Invalid input must reach the policy, not just the log.
         supervisor_.observe_target(
             0, false, std::numeric_limits<double>::infinity());
 
-        update_safety();
+        publish_approved_command();
     }
 
     void handle_candidate(Candidate::ConstSharedPtr message)
