@@ -61,9 +61,20 @@ if(BUILD_TESTING)
 
   add_launch_test(
   test/test_mission_manager_launch.py
-  TIMEOUT 30
+  TIMEOUT 60
   RUNNER "${ament_cmake_ros_DIR}/run_test_isolated.py"
 )
+
+  foreach(integration_test IN ITEMS
+      test_supervisor_edges_launch
+      test_supervisor_clock_launch
+      test_controller_supervisor_launch)
+    add_launch_test(
+      test/${integration_test}.py
+      TIMEOUT 90
+      RUNNER "${ament_cmake_ros_DIR}/run_test_isolated.py"
+    )
+  endforeach()
 
   target_include_directories(candidate_safety_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include

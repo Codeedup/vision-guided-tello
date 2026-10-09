@@ -22,6 +22,8 @@
   <test_depend>launch_testing</test_depend>
   <test_depend>launch_testing_ament_cmake</test_depend>
   <test_depend>rclpy</test_depend>
+  <test_depend>rosgraph_msgs</test_depend>
+  <test_depend>tracking_controller</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

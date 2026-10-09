@@ -409,6 +409,164 @@ class TestApprovedOutput(unittest.TestCase):
 
             self.call_service(self.takeover_client, Trigger.Request())
 
+    def test_invalid_candidates_block_approved_motion(self):
+        # name, target_valid, lateral, vertical, timestamp condition
+        cases = [
+            ("invalid_target", False, 5.0, -3.0, "fresh"),
+            ("missing_stamp", True, 5.0, -3.0, "missing"),
+            ("malformed_stamp", True, 5.0, -3.0, "malformed"),
+            ("stale_stamp", True, 5.0, -3.0, "stale"),
+            ("future_stamp", True, 5.0, -3.0, "future"),
+            ("nan_lateral", True, float("nan"), -3.0, "fresh"),
+            ("infinite_vertical", True, 5.0, float("inf"), "fresh"),
+            ("excessive_lateral", True, 50.0, -3.0, "fresh"),
+            ("excessive_vertical", True, 5.0, -50.0, "fresh"),
+        ]
+
+        for name, target_valid, lateral, vertical, stamp_kind in cases:
+            with self.subTest(case=name):
+                self.call_service(
+                    self.takeover_client, Trigger.Request()
+                )
+                self.messages.clear()
+
+                good_frame = "valid_" + name
+                bad_frame = "invalid_" + name
+                mode = {"bad": False, "sent": 0}
+
+                def publish_candidate():
+                    candidate = CandidateCommand()
+                    candidate.header.stamp = (
+                        self.node.get_clock().now().to_msg()
+                    )
+                    candidate.header.frame_id = good_frame
+                    candidate.target_valid = True
+                    candidate.lateral = 5.0
+                    candidate.vertical = -3.0
+
+                    if mode["bad"]:
+                        candidate.header.frame_id = bad_frame
+                        candidate.target_valid = target_valid
+                        candidate.lateral = lateral
+                        candidate.vertical = vertical
+
+                        if stamp_kind == "missing":
+                            candidate.header.stamp.sec = 0
+                            candidate.header.stamp.nanosec = 0
+                        elif stamp_kind == "malformed":
+                            candidate.header.stamp.nanosec = 1_000_000_000
+                        elif stamp_kind == "stale":
+                            candidate.header.stamp.sec -= 1
+                        elif stamp_kind == "future":
+                            candidate.header.stamp.sec += 1
+
+                        mode["sent"] += 1
+
+                    self.publisher.publish(candidate)
+
+                timer = self.node.create_timer(0.05, publish_candidate)
+
+                try:
+                    request = SetBool.Request()
+                    request.data = True
+                    self.call_service(self.autonomy_client, request)
+
+                    self.assertTrue(
+                        self.wait_until(
+                            lambda: any(
+                                message.tracking_allowed
+                                and message.source_header.frame_id
+                                == good_frame
+                                for _, message in self.messages
+                            ),
+                            timeout=2.0,
+                        ),
+                        "Valid input did not establish tracking",
+                    )
+
+                    mode["bad"] = True
+                    cutoff_ns = self.node.get_clock().now().nanoseconds
+                    self.messages.clear()
+
+                    def outputs_after_switch():
+                        return [
+                            (received_at, message)
+                            for received_at, message in self.messages
+                            if self.stamp_ns(message.header.stamp)
+                            >= cutoff_ns
+                        ]
+
+                    def neutral_outputs():
+                        return [
+                            message
+                            for _, message in outputs_after_switch()
+                            if (
+                                message.autonomy_enabled
+                                and not message.tracking_allowed
+                            )
+                        ]
+
+                    self.assertTrue(
+                        self.wait_until(
+                            lambda: bool(neutral_outputs()),
+                            timeout=1.0,
+                        ),
+                        "Invalid input did not block motion",
+                    )
+
+                    neutral_stamp = self.stamp_ns(
+                        neutral_outputs()[0].header.stamp
+                    )
+
+                    def outputs_after_neutral():
+                        return [
+                            (received_at, message)
+                            for received_at, message
+                            in outputs_after_switch()
+                            if self.stamp_ns(message.header.stamp)
+                            >= neutral_stamp
+                        ]
+
+                    def rejection_continues():
+                        outputs = outputs_after_neutral()
+                        return (
+                            mode["sent"] >= 5
+                            and len(outputs) >= 2
+                            and outputs[-1][0] - outputs[0][0] >= 0.3
+                        )
+
+                    self.assertTrue(
+                        self.wait_until(
+                            rejection_continues, timeout=2.0
+                        ),
+                        "Invalid stream or neutral output did not continue",
+                    )
+
+                    # Never approve an observation from the invalid stream.
+                    for _, message in outputs_after_switch():
+                        if message.tracking_allowed:
+                            self.assertNotEqual(
+                                message.source_header.frame_id,
+                                bad_frame,
+                            )
+
+                    # Once blocked, invalid input cannot restore motion.
+                    for _, message in outputs_after_neutral():
+                        self.assertTrue(message.autonomy_enabled)
+                        self.assertFalse(message.tracking_allowed)
+                        self.assertEqual(message.lateral, 0.0)
+                        self.assertEqual(message.vertical, 0.0)
+                        self.assertEqual(
+                            message.source_header.frame_id,
+                            good_frame,
+                        )
+
+                finally:
+                    self.node.destroy_timer(timer)
+                    self.call_service(
+                        self.takeover_client, Trigger.Request()
+                    )
+
 @launch_testing.post_shutdown_test()
 class TestProcessExit(unittest.TestCase):
     def test_clean_exit(self, proc_info, mission_manager):
