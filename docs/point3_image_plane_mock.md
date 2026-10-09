@@ -17,11 +17,29 @@ scenario harness compiles and calls the actual existing C++ controller and
 supervisor headers. It supplies its own scheduling and input cache, so it is
 not evidence for the production ROS wrappers, watchdog threads or DDS.
 
-**ROS build and the new real-chain launch tests remain unverified here** because
-this environment has no ROS, colcon, rclpy or generated drone interfaces.
-Run the WSL validation below before marking this milestone complete. Do not
-add these counts to earlier colcon totals or claim independent flight behaviors
-from an aggregate test count.
+**WSL build and automated validation are now reported passing by the user.**
+The authoring environment still has no ROS, colcon, rclpy or generated drone
+interfaces; the assistant has not independently inspected the WSL test XML.
+
+| User-reported check, 9 October 2026 | Result |
+|---|---|
+| `colcon build --packages-up-to mock_tello` | Built successfully |
+| New mock package test run and package-specific results | 30 tests passed |
+| Existing controller/supervisor behavior regressions followed by all results | 122 tests, no failures |
+
+The mock run selected `mock_tello` with `--ctest-args --output-on-failure`.
+The subsequent regression run selected `tracking_controller mission_manager`
+with filter `controller_tests|supervisor_tests|candidate_safety_tests|test_.*launch`,
+then used `colcon test-result --all --verbose`. These reported counts include
+the runner's aggregate conventions and possibly retained results; they are not
+counts of independent safety behaviors. Raw logs and individual discovery
+results were not supplied. Do not add 30 to 122.
+
+The implementation was saved as commit
+`9bffc54cab7db46dae0b3cb30e686a3196c065c4` on `feature/image-plane-mock`,
+with [draft PR #1](https://github.com/Codeedup/vision-guided-tello/pull/1).
+Next checkpoint: manually launch the static mock, explicitly enable autonomy,
+and observe centering. That demonstration has not yet been reported.
 
 No existing controller, supervisor, message, or test was changed. No SDK,
 network socket, takeoff, real landing command, or aircraft connection was added.
@@ -291,8 +309,9 @@ budget changes occur because all added code runs on the laptop and adds no
 payload. The simulation omits attitude, yaw, distance changes, perspective,
 occlusion geometry, motor dynamics and external disturbances.
 
-Point 3 can be accepted after the WSL build, new ROS launch suite and existing
-behavior regressions pass with fresh recorded results. The next milestone is
+The WSL build, mock suite and existing behavior regressions are reported passing
+as recorded above. Keep their actual test reports for the engineering record;
+the manual static demonstration is the next check. The following milestone is
 webcam OpenCV/MediaPipe perception with motion still simulated. Replacing the
 synthetic observations requires an explicit feedback design: a live stationary
 webcam does not move in response to mock drone commands. Do not run two
