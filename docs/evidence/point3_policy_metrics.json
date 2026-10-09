@@ -1,0 +1,334 @@
+[
+  {
+    "name": "horizontal",
+    "scenario": "static",
+    "config": {
+      "initial_x": 0.6,
+      "initial_y": 0,
+      "gain_x": 0.04,
+      "gain_y": 0.04,
+      "response_tau": 0.15,
+      "sensor_delay": 0.0,
+      "noise_stddev": 0.0,
+      "seed": 7
+    },
+    "duration_seconds": 8,
+    "fault_start_seconds": 1.0,
+    "fault_duration_seconds": 0.6,
+    "final_error_x": 0.06546958444579266,
+    "final_error_y": 0.0,
+    "tail_max_abs_x": 0.06546958444579445,
+    "tail_max_abs_y": 0.0,
+    "static_settled_seconds": 2.56,
+    "tracking_entries_seconds": [
+      0.2
+    ],
+    "first_neutral_after_fault": null,
+    "first_landing_request": null,
+    "mock_terminal": false,
+    "max_abs_scalar": 10.0,
+    "timeout_observed": false
+  },
+  {
+    "name": "vertical",
+    "scenario": "static",
+    "config": {
+      "initial_x": 0,
+      "initial_y": -0.4,
+      "gain_x": 0.04,
+      "gain_y": 0.04,
+      "response_tau": 0.15,
+      "sensor_delay": 0.0,
+      "noise_stddev": 0.0,
+      "seed": 7
+    },
+    "duration_seconds": 8,
+    "fault_start_seconds": 1.0,
+    "fault_duration_seconds": 0.6,
+    "final_error_x": 0.0,
+    "final_error_y": -0.06717487264319028,
+    "tail_max_abs_x": 0.0,
+    "tail_max_abs_y": 0.06717487264319028,
+    "static_settled_seconds": 2.08,
+    "tracking_entries_seconds": [
+      0.2
+    ],
+    "first_neutral_after_fault": null,
+    "first_landing_request": null,
+    "mock_terminal": false,
+    "max_abs_scalar": 8.0,
+    "timeout_observed": false
+  },
+  {
+    "name": "two_axes",
+    "scenario": "static",
+    "config": {
+      "initial_x": 0.6,
+      "initial_y": -0.4,
+      "gain_x": 0.04,
+      "gain_y": 0.04,
+      "response_tau": 0.15,
+      "sensor_delay": 0.0,
+      "noise_stddev": 0.0,
+      "seed": 7
+    },
+    "duration_seconds": 8,
+    "fault_start_seconds": 1.0,
+    "fault_duration_seconds": 0.6,
+    "final_error_x": 0.06546958444579266,
+    "final_error_y": -0.06717487264319028,
+    "tail_max_abs_x": 0.06546958444579445,
+    "tail_max_abs_y": 0.06717487264319028,
+    "static_settled_seconds": 2.56,
+    "tracking_entries_seconds": [
+      0.2
+    ],
+    "first_neutral_after_fault": null,
+    "first_landing_request": null,
+    "mock_terminal": false,
+    "max_abs_scalar": 10.0,
+    "timeout_observed": false
+  },
+  {
+    "name": "delay_noise",
+    "scenario": "static",
+    "config": {
+      "initial_x": 0.6,
+      "initial_y": -0.4,
+      "gain_x": 0.04,
+      "gain_y": 0.04,
+      "response_tau": 0.15,
+      "sensor_delay": 0.1,
+      "noise_stddev": 0.004,
+      "seed": 7
+    },
+    "duration_seconds": 8,
+    "fault_start_seconds": 1.0,
+    "fault_duration_seconds": 0.6,
+    "final_error_x": 0.057435868756370134,
+    "final_error_y": -0.06003222036544877,
+    "tail_max_abs_x": 0.05743586875637203,
+    "tail_max_abs_y": 0.06003222036544881,
+    "static_settled_seconds": 2.46,
+    "tracking_entries_seconds": [
+      0.31
+    ],
+    "first_neutral_after_fault": null,
+    "first_landing_request": null,
+    "mock_terminal": false,
+    "max_abs_scalar": 10.0,
+    "timeout_observed": false
+  },
+  {
+    "name": "moving",
+    "scenario": "moving",
+    "config": {
+      "initial_x": 0.6,
+      "initial_y": -0.4,
+      "gain_x": 0.04,
+      "gain_y": 0.04,
+      "response_tau": 0.15,
+      "sensor_delay": 0.0,
+      "noise_stddev": 0.0,
+      "seed": 7
+    },
+    "duration_seconds": 8,
+    "fault_start_seconds": 1.0,
+    "fault_duration_seconds": 0.6,
+    "final_error_x": -0.11034777791043675,
+    "final_error_y": 0.08115884249830116,
+    "tail_max_abs_x": 0.11034777791043675,
+    "tail_max_abs_y": 0.09134618415995872,
+    "static_settled_seconds": null,
+    "tracking_entries_seconds": [
+      0.2
+    ],
+    "first_neutral_after_fault": null,
+    "first_landing_request": null,
+    "mock_terminal": false,
+    "max_abs_scalar": 10.0,
+    "timeout_observed": false
+  },
+  {
+    "name": "dropout",
+    "scenario": "dropout",
+    "config": {
+      "initial_x": 0.6,
+      "initial_y": -0.4,
+      "gain_x": 0.04,
+      "gain_y": 0.04,
+      "response_tau": 0.15,
+      "sensor_delay": 0.0,
+      "noise_stddev": 0.0,
+      "seed": 7
+    },
+    "duration_seconds": 8,
+    "fault_start_seconds": 1.0,
+    "fault_duration_seconds": 0.6,
+    "final_error_x": 0.06761041412132351,
+    "final_error_y": -0.06615339715363049,
+    "tail_max_abs_x": 0.06761041412172332,
+    "tail_max_abs_y": 0.06615339715364979,
+    "static_settled_seconds": 3.39,
+    "tracking_entries_seconds": [
+      0.2,
+      1.8
+    ],
+    "first_neutral_after_fault": 1.0,
+    "first_landing_request": null,
+    "mock_terminal": false,
+    "max_abs_scalar": 10.0,
+    "timeout_observed": false
+  },
+  {
+    "name": "ambiguous",
+    "scenario": "ambiguous",
+    "config": {
+      "initial_x": 0.6,
+      "initial_y": -0.4,
+      "gain_x": 0.04,
+      "gain_y": 0.04,
+      "response_tau": 0.15,
+      "sensor_delay": 0.0,
+      "noise_stddev": 0.0,
+      "seed": 7
+    },
+    "duration_seconds": 8,
+    "fault_start_seconds": 1.0,
+    "fault_duration_seconds": 0.6,
+    "final_error_x": 0.06761041412132351,
+    "final_error_y": -0.06615339715363049,
+    "tail_max_abs_x": 0.06761041412172332,
+    "tail_max_abs_y": 0.06615339715364979,
+    "static_settled_seconds": 3.39,
+    "tracking_entries_seconds": [
+      0.2,
+      1.8
+    ],
+    "first_neutral_after_fault": 1.0,
+    "first_landing_request": null,
+    "mock_terminal": false,
+    "max_abs_scalar": 10.0,
+    "timeout_observed": false
+  },
+  {
+    "name": "silence",
+    "scenario": "silence",
+    "config": {
+      "initial_x": 0.6,
+      "initial_y": -0.4,
+      "gain_x": 0.04,
+      "gain_y": 0.04,
+      "response_tau": 0.15,
+      "sensor_delay": 0.0,
+      "noise_stddev": 0.0,
+      "seed": 7
+    },
+    "duration_seconds": 8,
+    "fault_start_seconds": 1.0,
+    "fault_duration_seconds": 0.6,
+    "final_error_x": 0.06670197572079357,
+    "final_error_y": -0.06839882870392626,
+    "tail_max_abs_x": 0.06670197572089741,
+    "tail_max_abs_y": 0.06839882870392992,
+    "static_settled_seconds": 3.18,
+    "tracking_entries_seconds": [
+      0.2,
+      1.8
+    ],
+    "first_neutral_after_fault": 1.2,
+    "first_landing_request": null,
+    "mock_terminal": false,
+    "max_abs_scalar": 10.0,
+    "timeout_observed": false
+  },
+  {
+    "name": "sustained_loss",
+    "scenario": "loss",
+    "config": {
+      "initial_x": 0.6,
+      "initial_y": -0.4,
+      "gain_x": 0.04,
+      "gain_y": 0.04,
+      "response_tau": 0.15,
+      "sensor_delay": 0.0,
+      "noise_stddev": 0.0,
+      "seed": 7
+    },
+    "duration_seconds": 8,
+    "fault_start_seconds": 1.0,
+    "fault_duration_seconds": 2.5,
+    "final_error_x": 0.3021948185083328,
+    "final_error_y": -0.19226908376918225,
+    "tail_max_abs_x": 0.3021948185083328,
+    "tail_max_abs_y": 0.19226908376918225,
+    "static_settled_seconds": null,
+    "tracking_entries_seconds": [
+      0.2
+    ],
+    "first_neutral_after_fault": 1.0,
+    "first_landing_request": 2.5,
+    "mock_terminal": true,
+    "max_abs_scalar": 10.0,
+    "timeout_observed": false
+  },
+  {
+    "name": "source_stale",
+    "scenario": "static",
+    "config": {
+      "initial_x": 0.6,
+      "initial_y": -0.4,
+      "gain_x": 0.04,
+      "gain_y": 0.04,
+      "response_tau": 0.15,
+      "sensor_delay": 0.3,
+      "noise_stddev": 0.0,
+      "seed": 7
+    },
+    "duration_seconds": 8,
+    "fault_start_seconds": 1.0,
+    "fault_duration_seconds": 0.6,
+    "final_error_x": 0.6,
+    "final_error_y": -0.4,
+    "tail_max_abs_x": 0.6,
+    "tail_max_abs_y": 0.4,
+    "static_settled_seconds": null,
+    "tracking_entries_seconds": [],
+    "first_neutral_after_fault": 1.0,
+    "first_landing_request": 1.5,
+    "mock_terminal": true,
+    "max_abs_scalar": 0.0,
+    "timeout_observed": false
+  },
+  {
+    "name": "supervisor_stall",
+    "scenario": "static",
+    "config": {
+      "initial_x": 0.6,
+      "initial_y": -0.4,
+      "gain_x": 0.04,
+      "gain_y": 0.04,
+      "response_tau": 0.15,
+      "sensor_delay": 0.0,
+      "noise_stddev": 0.0,
+      "seed": 7
+    },
+    "duration_seconds": 8,
+    "fault_start_seconds": 1.0,
+    "fault_duration_seconds": 0.6,
+    "final_error_x": 0.06674062080559522,
+    "final_error_y": -0.06843817843968926,
+    "tail_max_abs_x": 0.06674062080709113,
+    "tail_max_abs_y": 0.06843817843974323,
+    "static_settled_seconds": 3.58,
+    "tracking_entries_seconds": [
+      0.2,
+      2.2
+    ],
+    "first_neutral_after_fault": 2.0,
+    "first_landing_request": null,
+    "mock_terminal": false,
+    "max_abs_scalar": 10.0,
+    "timeout_observed": true
+  }
+]
