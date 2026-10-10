@@ -10,6 +10,7 @@ from dataclasses import asdict
 import json
 import math
 from pathlib import Path
+import socket
 import sys
 import time
 
@@ -22,6 +23,55 @@ from tello_bridge.transport import (  # noqa: E402
     FakeTransport,
     UdpSdkTransport,
 )
+
+
+class VideoPacketProbe:
+    """Count video datagrams without decoding or retaining their contents."""
+
+    def __init__(self, host, bind='0.0.0.0', port=11111):
+        self.host = host
+        self.bind = bind
+        self.port = port
+        self.socket = None
+        self.expected_ip = None
+        self.bound_address = None
+        self.packets = 0
+        self.bytes = 0
+        self.unexpected_source_packets = 0
+        self.maximum_datagram_bytes = 0
+
+    def start(self):
+        self.expected_ip = socket.gethostbyname(self.host)
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.socket.bind((self.bind, self.port))
+        self.bound_address = self.socket.getsockname()
+        self.socket.setblocking(False)
+
+    def read(self):
+        # Bound each poll so telemetry and cleanup retain execution time.
+        for _ in range(64):
+            try:
+                payload, peer = self.socket.recvfrom(65535)
+            except BlockingIOError:
+                break
+            if peer[0] != self.expected_ip:
+                self.unexpected_source_packets += 1
+                continue
+            self.packets += 1
+            self.bytes += len(payload)
+            self.maximum_datagram_bytes = max(self.maximum_datagram_bytes, len(payload))
+        return None
+
+    def report(self):
+        return {'mode': 'packets_only', 'expected_source_ip': self.expected_ip,
+                'bound_address': self.bound_address, 'packets': self.packets,
+                'bytes': self.bytes, 'unexpected_source_packets': self.unexpected_source_packets,
+                'maximum_datagram_bytes': self.maximum_datagram_bytes}
+
+    def close(self):
+        if self.socket is not None:
+            self.socket.close()
+            self.socket = None
 
 
 def run_diagnostic(transport, duration=2, video=False, decoder_factory=None, state_source=None):
@@ -55,11 +105,11 @@ def run_diagnostic(transport, duration=2, video=False, decoder_factory=None, sta
             # This cadence is a provisional host limit, not a measured aircraft limit.
             time.sleep(0.1)
         if video:
-            stream_attempted = True
-            channel.send('streamon', time.monotonic_ns())
             if decoder_factory:
                 decoder = decoder_factory()
                 decoder.start()
+            stream_attempted = True
+            channel.send('streamon', time.monotonic_ns())
         deadline = time.monotonic() + duration
         while time.monotonic() < deadline:
             transport.poll(time.monotonic_ns())
@@ -81,6 +131,8 @@ def run_diagnostic(transport, duration=2, video=False, decoder_factory=None, sta
         process = getattr(decoder, 'process', None)
         result['decoder_exitcode_at_observation_end'] = (
             None if process is None else process.exitcode)
+        if isinstance(decoder, VideoPacketProbe):
+            result['video_packet_probe'] = decoder.report()
         try:
             if decoder:
                 decoder.close()
@@ -121,14 +173,23 @@ def main(argv=None):
     parser.add_argument('--local-port', type=int, default=8889)
     parser.add_argument('--duration', type=float, default=2)
     parser.add_argument('--video', action='store_true')
+    parser.add_argument('--video-packets', action='store_true',
+                        help='Count UDP video packets instead of decoding; '
+                             'requires --hardware --video')
     args = parser.parse_args(argv)
     if not math.isfinite(args.duration) or not 0 < args.duration <= 60:
         parser.error('duration must be in (0,60]')
+    if args.video_packets and not (args.hardware and args.video):
+        parser.error('--video-packets requires --hardware and --video')
     transport = (UdpSdkTransport(args.host, bind=args.bind, local_port=args.local_port)
                  if args.hardware else FakeTransport())
     state_source = StateReceiver(args.host, args.bind) if args.hardware else None
     decoder_factory = None
-    if args.video and args.hardware:
+    if args.video_packets:
+        def packet_probe():
+            return VideoPacketProbe(args.host, args.bind)
+        decoder_factory = packet_probe
+    elif args.video and args.hardware:
         from frame_sources import DecoderSource
 
         def hardware_decoder():

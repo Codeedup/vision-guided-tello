@@ -1,9 +1,10 @@
 """Exercise the complete diagnostic/cleanup paths with traps for flight commands."""
 from unittest.mock import Mock, patch
 from queue import Queue
+import socket
 from types import SimpleNamespace
 
-from diagnose import run_diagnostic
+from diagnose import main, run_diagnostic, VideoPacketProbe
 from frame_sources import decoder_worker
 import pytest
 from tello_bridge.policy import Telemetry
@@ -89,3 +90,86 @@ def test_slow_cleanup_does_not_change_observation_end_telemetry_age():
     assert result['cleanup_duration_ms'] == 2000
     assert result['telemetry_age_ms_at_finish'] == (
         result['telemetry_age_ms_at_observation_end'] + 2000)
+
+
+def test_video_packet_probe_counts_loopback_datagrams_without_frames():
+    probe = VideoPacketProbe('127.0.0.1', '127.0.0.1', port=0)
+    try:
+        probe.start()
+        assert probe.read() is None  # Empty socket returns immediately.
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sender:
+            for payload in (b'synthetic', b'video'):
+                sender.sendto(payload, probe.bound_address)
+        assert probe.read() is None
+        report = probe.report()
+        assert report['packets'] == 2
+        assert report['bytes'] == 14
+        assert report['maximum_datagram_bytes'] == 9
+        assert report['unexpected_source_packets'] == 0
+        assert report['mode'] == 'packets_only'
+    finally:
+        probe.close()
+    assert probe.socket is None
+
+
+def test_video_packet_probe_does_not_count_other_hosts_as_aircraft_video():
+    probe = VideoPacketProbe('127.0.0.2', '127.0.0.1', port=0)
+    try:
+        probe.start()
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sender:
+            sender.bind(('127.0.0.1', 0))
+            sender.sendto(b'other sender', probe.bound_address)
+        probe.read()
+        assert probe.report()['unexpected_source_packets'] == 1
+        assert probe.report()['packets'] == 0
+        assert probe.report()['bytes'] == 0
+    finally:
+        probe.close()
+
+
+def test_packet_probe_bind_failure_closes_resources_before_streamon():
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as occupied:
+        occupied.bind(('127.0.0.1', 0))
+        probe = VideoPacketProbe('127.0.0.1', *occupied.getsockname())
+        transport = FakeTransport()
+        with patch('diagnose.time.sleep'), pytest.raises(OSError):
+            run_diagnostic(transport, duration=0, video=True, decoder_factory=lambda: probe)
+    assert probe.socket is None
+    assert not transport.connected
+    assert not any(e.get('attempt') == 'streamon' for e in transport.events)
+
+
+def test_packet_diagnostic_binds_before_streamon_and_reports_before_cleanup():
+    probe = VideoPacketProbe('127.0.0.1', '127.0.0.1', port=0)
+
+    class SyntheticTransport(FakeTransport):
+        def _send(self, text, mono_ns):
+            super()._send(text, mono_ns)
+            if text == 'streamon':
+                assert probe.bound_address is not None
+                with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sender:
+                    sender.sendto(b'synthetic', probe.bound_address)
+
+    transport = SyntheticTransport()
+    transport.send_rc = Mock(side_effect=AssertionError('RC forbidden'))
+    transport.send_land = Mock(side_effect=AssertionError('Land forbidden'))
+    with patch('diagnose.time.sleep'):
+        result = run_diagnostic(transport, duration=0.01, video=True,
+                                decoder_factory=lambda: probe)
+    assert result['frames'] == 0
+    assert result['video_packet_probe']['packets'] == 1
+    assert result['video_packet_probe']['bytes'] == 9
+    assert result['decoder_error'] is None
+    assert set(e['attempt'] for e in result['events'] if 'attempt' in e) <= DIAGNOSTIC_COMMANDS
+    assert result['events'][-1]['attempt'] == 'streamoff'
+    assert probe.socket is None
+    assert not transport.connected
+
+
+@pytest.mark.parametrize('args', [('--video-packets',), ('--video', '--video-packets'),
+                                  ('--hardware', '--video-packets')])
+def test_packet_probe_requires_explicit_hardware_video_mode(args):
+    with patch('diagnose.UdpSdkTransport') as transport, pytest.raises(SystemExit) as error:
+        main(args)
+    assert error.value.code == 2
+    transport.assert_not_called()
