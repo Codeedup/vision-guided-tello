@@ -25,6 +25,8 @@ if(BUILD_TESTING)
   ament_lint_cmake()
   ament_add_pytest_test(boundary_tests test/test_boundary.py
     APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR})
+  ament_add_pytest_test(timing_tests test/test_timing.py
+    APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR})
   ament_add_pytest_test(webcam_tools_tests ${WEBCAM_TOOLS}
     APPEND_ENV PYTHONPATH=${WEBCAM_TOOLS} TIMEOUT 60)
   ament_add_pytest_test(diagnostic_tests ${WEBCAM_TOOLS}/../tello_diagnostics
@@ -35,3 +37,4 @@ if(BUILD_TESTING)
     RUNNER "${ament_cmake_ros_DIR}/run_test_isolated.py")
 endif()
 ament_package()
+

@@ -17,10 +17,16 @@ def main():
     parser.add_argument('--bind', default=os.environ.get('TELLO_BIND', '127.0.0.1'))
     parser.add_argument('--port', type=int,
                         default=int(os.environ.get('TELLO_OBSERVATION_PORT', '5005')))
+    parser.add_argument('--bridge-trace', default='', help='New FAKE server timing report')
+    parser.add_argument('--trace-label', default='')
     args = parser.parse_args()
     if not 0 <= args.port <= 65535:
         parser.error('Invalid observation UDP port')
     stopping = False
+    revision = subprocess.run(['git', '-C', str(ROOT), 'rev-parse', 'HEAD'],
+                              capture_output=True, text=True)
+    launch_env = dict(os.environ, TELLO_REVISION=(
+        revision.stdout.strip() if revision.returncode == 0 else 'UNRECORDED'))
 
     def request_stop(signum, frame):
         nonlocal stopping
@@ -30,8 +36,9 @@ def main():
     signal.signal(signal.SIGTERM, request_stop)
     launch = subprocess.Popen([
         'ros2', 'launch', 'tello_bridge', 'webcam.launch.py',
-        'namespace:=' + args.namespace, 'bind:=' + args.bind, 'port:=' + str(args.port)],
-        start_new_session=True)
+        'namespace:=' + args.namespace, 'bind:=' + args.bind, 'port:=' + str(args.port),
+        'bridge_trace:=' + args.bridge_trace, 'trace_label:=' + args.trace_label],
+        start_new_session=True, env=launch_env)
     print('Receiver/controller/supervisor/FAKE bridge; autonomy disabled. '
           'Ctrl+C requests takeover before stopping ROS.', flush=True)
     try:

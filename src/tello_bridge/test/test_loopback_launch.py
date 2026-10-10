@@ -32,9 +32,13 @@ from synthetic_observations import observation  # noqa: E402, I100
 
 @pytest.mark.launch_test
 def generate_test_description():
+    trace_dir = tempfile.mkdtemp(prefix='tello-loopback-timing-')
     processes = {name: launch_ros.actions.Node(
         package=package, executable=executable, namespace='loopback_boundary',
-        parameters=[{'use_sim_time': False}],
+        parameters=[{'use_sim_time': False}, *(
+            [{'timing_trace_path': str(Path(trace_dir) / 'bridge.json'),
+              'timing_trace_label': 'ROS regression', 'timing_trace_capacity': 100000}]
+            if name == 'bridge' else [])],
         arguments=['--ros-args', '--log-level', 'warn'], output='screen')
         for name, package, executable in (
             ('controller', 'tracking_controller', 'tracking_controller_node'),
@@ -42,7 +46,7 @@ def generate_test_description():
             ('bridge', 'tello_bridge', 'tello_bridge_node'))}
     return launch.LaunchDescription([
         *processes.values(), launch_testing.actions.ReadyToTest(),
-    ]), {'processes': processes}
+    ]), {'processes': processes, 'trace_dir': trace_dir}
 
 
 class TestLoopback(unittest.TestCase):
@@ -267,19 +271,29 @@ class TestLoopback(unittest.TestCase):
         self.assertFalse(self.states[-1][1]['armed'])
         stream.cancel()
 
-    def test_operator_cli_bounded_session_and_takeover(self):
+    def test_operator_cli_bounded_session_and_takeover(self, trace_dir):
         stream = self.start_sender()
+        trace_path = Path(trace_dir) / 'operator.json'
         process = subprocess.Popen([
             sys.executable, str(ROOT / 'src/tello_bridge/scripts/tello_operator'),
-            'enable', '--namespace', '/loopback_boundary', '--duration', '0.8'],
+            'enable', '--namespace', '/loopback_boundary', '--duration', '10',
+            '--trace', str(trace_path)],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         try:
-            self.wait(lambda: process.poll() is not None, 12)
+            self.wait(lambda: process.poll() is not None, 20)
             stdout, stderr = process.communicate(timeout=1)
             self.assertEqual(process.returncode, 0, stdout + stderr)
             self.assertTrue(any(state['reason'] == 'TRACKING' for _, state in self.states))
             self.wait(lambda: self.states[-1][1]['upstream_disabled'])
             self.assertFalse(self.states[-1][1]['armed'])
+            self.assertTrue(self.states[-1][1]['upstream_disabled'])
+            report = json.loads(trace_path.read_text())
+            heartbeats = [event for event in report['events']
+                          if event.get('path') == 'tello_bridge/heartbeat']
+            self.assertGreaterEqual(len(heartbeats), 100)
+            self.assertTrue(all(event['success'] for event in heartbeats))
+            sends = [event['send_ns'] for event in heartbeats]
+            self.assertTrue(all(b - a >= 75000000 for a, b in zip(sends, sends[1:])))
         finally:
             stream.cancel()
             if process.poll() is None:
@@ -306,6 +320,27 @@ class TestLoopback(unittest.TestCase):
         self.wait(lambda: self.states[-1][1]['upstream_disabled'])
         self.assertTrue(self.states[-1][1]['landing_latched'])
         self.assertTrue(any(self.stamp(m.source_header.stamp) == source for m in self.approved))
+
+    def test_operator_cli_ctrl_c_revokes_both_layers(self):
+        stream = self.start_sender()
+        process = subprocess.Popen([
+            sys.executable, str(ROOT / 'src/tello_bridge/scripts/tello_operator'),
+            'enable', '--namespace', '/loopback_boundary', '--duration', '10'],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        try:
+            self.wait(lambda: self.states[-1][1]['reason'] == 'TRACKING', 8)
+            process.send_signal(signal.SIGINT)
+            self.wait(lambda: process.poll() is not None, 8)
+            stdout, stderr = process.communicate(timeout=1)
+            self.assertEqual(process.returncode, 0, stdout + stderr)
+            self.wait(lambda: self.states[-1][1]['upstream_disabled'])
+            self.assertFalse(self.states[-1][1]['armed'])
+            self.assertEqual(self.states[-1][1]['last_rc'], [0, 0, 0, 0])
+        finally:
+            stream.cancel()
+            if process.poll() is None:
+                process.kill()
+                process.wait()
 
     def test_supervisor_suspension_expires_consumer_authority(self, proc_info, processes):
         self.acquire()
@@ -338,3 +373,25 @@ class TestShutdown(unittest.TestCase):
     def test_processes_exit_cleanly(self, proc_info, processes):
         for process in processes.values():
             launch_testing.asserts.assertExitCodes(proc_info, process=process)
+
+    def test_correlated_server_receipts_and_first_expiry(self, trace_dir):
+        directory = Path(trace_dir)
+        bridge = json.loads((directory / 'bridge.json').read_text())
+        operator = json.loads((directory / 'operator.json').read_text())
+        heartbeats = [event for event in operator['events']
+                      if event.get('path') == 'tello_bridge/heartbeat']
+        start, end = heartbeats[0]['send_ns'], heartbeats[-1]['response_observed_ns']
+        accepted = [event for event in bridge['events']
+                    if event['kind'] == 'operator_callback' and
+                    event.get('action') == 'heartbeat' and start <= event['start_ns'] <= end]
+        self.assertEqual(len(accepted), len(heartbeats))
+        self.assertTrue(all(event['accepted'] for event in accepted))
+        receipts = [event['after']['operator_receipt_ns'] for event in accepted]
+        self.assertTrue(all(0 < b - a < 300000000 for a, b in zip(receipts, receipts[1:])))
+        self.assertEqual(bridge['events_omitted'], 0)
+        # A separate existing deliberate operator-loss trial must be diagnosed.
+        self.assertIsNotNone(bridge['first_expiry'])
+        self.assertEqual(bridge['first_expiry']['after']['reason'], 'OPERATOR_LEASE_EXPIRED')
+        self.assertFalse(bridge['first_expiry']['after']['armed'])
+        self.assertTrue(any(event['kind'] == 'transport_operation'
+                            for event in bridge['events']))

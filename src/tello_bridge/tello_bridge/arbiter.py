@@ -1,5 +1,7 @@
 """One transport owner. All safety and operator paths remain nonblocking."""
 
+import time
+
 from tello_bridge.policy import Authority
 
 
@@ -10,6 +12,23 @@ class Arbiter:
         self.last_rc = None
         self.last_send_ns = None
         self.owned_last_tick = False
+        self.trace = None
+
+    def transport_call(self, operation, *args):
+        if self.trace is None:
+            return getattr(self.transport, operation)(*args)
+        start = time.monotonic_ns()
+        error_name = None
+        try:
+            return getattr(self.transport, operation)(*args)
+        except BaseException as error:
+            error_name = type(error).__name__
+            raise
+        finally:
+            end = time.monotonic_ns()
+            self.trace.record('transport_operation', operation=operation,
+                              start_ns=start, end_ns=end, duration_ns=end - start,
+                              exception=error_name)
 
     def start(self):
         self.transport.start()
@@ -18,7 +37,7 @@ class Arbiter:
 
     def neutral(self, mono_ns):
         try:
-            self.transport.send_rc(0, 0, mono_ns)
+            self.transport_call('send_rc', 0, 0, mono_ns)
             self.last_rc = (0, 0, 0, 0)
             self.last_send_ns = mono_ns
         except OSError:
@@ -33,17 +52,17 @@ class Arbiter:
 
     def tick(self, ros_ns, mono_ns):
         try:
-            self.transport.poll(mono_ns)
+            self.transport_call('poll', mono_ns)
             kind, values = self.authority.action(ros_ns, mono_ns)
             owned = self.authority.armed or self.authority.landing_latched
             if kind == 'land':
                 self.neutral(mono_ns)
                 if self.authority.connected:
-                    self.transport.send_land(mono_ns)
+                    self.transport_call('send_land', mono_ns)
             elif kind == 'rc':
                 if (values != self.last_rc or self.last_send_ns is None
                         or mono_ns - self.last_send_ns >= 50_000_000):
-                    self.transport.send_rc(values[0], values[2], mono_ns)
+                    self.transport_call('send_rc', values[0], values[2], mono_ns)
                     self.last_rc, self.last_send_ns = values, mono_ns
             elif self.owned_last_tick:
                 self.neutral(mono_ns)
@@ -63,7 +82,7 @@ class Arbiter:
             try:
                 if self.authority.land_attempts < self.authority.limits.maximum_land_attempts:
                     self.authority.land_attempts += 1
-                    self.transport.send_land(mono_ns)
+                    self.transport_call('send_land', mono_ns)
             except OSError:
                 pass
         self.authority.disarm('SHUTDOWN')

@@ -26,7 +26,9 @@ jobs:
           rosdep install --from-paths src --ignore-src -r -y --rosdistro jazzy
       - name: Build and exercise registered production/loopback tests
         shell: bash
-        run: tools/run_offline_checks.sh
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          tools/run_offline_checks.sh
       - name: Optional decoder with synthetic lossless fixtures
         shell: bash
         run: |
@@ -36,7 +38,7 @@ jobs:
       - name: Pure policies without ROS environment
         shell: bash
         run: |
-          PYTHONPATH=src/tello_bridge:tools/webcam_perception:tools/tello_diagnostics python3 -m pytest -q src/tello_bridge/test/test_boundary.py tools/webcam_perception/test_measure_pipeline.py tools/webcam_perception/test_frame_sources.py tools/webcam_perception/test_open_palm.py tools/webcam_perception/test_model_asset.py tools/tello_diagnostics/test_diagnose.py
+          PYTHONPATH=src/tello_bridge:tools/webcam_perception:tools/tello_diagnostics python3 -m pytest -q src/tello_bridge/test/test_boundary.py src/tello_bridge/test/test_timing.py tools/webcam_perception/test_measure_pipeline.py tools/webcam_perception/test_frame_sources.py tools/webcam_perception/test_open_palm.py tools/webcam_perception/test_model_asset.py tools/tello_diagnostics/test_diagnose.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -44,3 +46,4 @@ jobs:
           path: |
             build/*/test_results
             log/latest_test
+            /tmp/tello-loopback-timing-*/
