@@ -1,5 +1,7 @@
 import argparse
+import hashlib
 import json
+from pathlib import Path
 import socket
 import time
 
@@ -10,15 +12,40 @@ from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from model_asset import verified_model
 from perception import target_from_landmarks
+from perception_timing import FrameTiming
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument('--receiver', required=True)
     parser.add_argument('--port', type=int, default=5005)
-    args = parser.parse_args()
+    parser.add_argument('--timing-trace', help='New bounded sender timing JSON; no overwrite')
+    parser.add_argument('--trace-label', default='')
+    parser.add_argument('--revision', default='UNRECORDED')
+    args = parser.parse_args(argv)
     if not 1 <= args.port <= 65535:
         parser.error('Invalid UDP port')
+    timing = None
+    if args.timing_trace:
+        timing = FrameTiming(args.timing_trace, metadata={
+            'label': args.trace_label, 'revision': args.revision,
+            'hand_preview_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+            'opencv': getattr(cv2, '__version__', 'UNKNOWN'),
+            'mediapipe': getattr(mp, '__version__', 'UNKNOWN'),
+            'receiver': args.receiver, 'port': args.port})
+    completion = 'error'
+    try:
+        run_preview(args, timing)
+        completion = 'quit'
+    except KeyboardInterrupt:
+        completion = 'interrupt'
+        raise
+    finally:
+        if timing:
+            timing.finish(completion)
+
+
+def run_preview(args, timing=None):
     options = vision.HandLandmarkerOptions(
         base_options=python.BaseOptions(
             model_asset_buffer=verified_model()
@@ -40,11 +67,18 @@ def main():
             print('Click the preview window and press Q to quit.')
 
             while True:
+                marks = {}
+                if timing:
+                    marks['read_start_ns'] = time.monotonic_ns()
                 sample = source.read()
+                if timing:
+                    marks['read_done_ns'] = time.monotonic_ns()
                 if sample is None:
                     raise RuntimeError('Could not read a camera frame.')
                 capture_time_ns = sample.receipt_ns
                 frame = sample.bgr_array().copy()
+                if timing:
+                    marks['copy_done_ns'] = time.monotonic_ns()
 
                 timestamp_ms = max(
                     time.monotonic_ns() // 1_000_000,
@@ -57,8 +91,12 @@ def main():
                     image_format=mp.ImageFormat.SRGB,
                     data=rgb_frame,
                 )
+                if timing:
+                    marks['preprocess_done_ns'] = time.monotonic_ns()
 
                 result = detector.detect_for_video(image, timestamp_ms)
+                if timing:
+                    marks['inference_done_ns'] = time.monotonic_ns()
 
                 height, width = frame.shape[:2]
 
@@ -134,25 +172,39 @@ def main():
                     2,
                 )
 
+                if timing:
+                    marks['annotation_done_ns'] = time.monotonic_ns()
                 observation = target_from_landmarks(
                     result.hand_landmarks, width, height, capture_time_ns)
+                if timing:
+                    marks['mapping_done_ns'] = time.monotonic_ns()
 
                 packet = json.dumps(
                     observation,
                     allow_nan=False,
                 ).encode('utf-8')
+                if timing:
+                    marks['encode_done_ns'] = time.monotonic_ns()
 
                 sender.sendto(packet, receiver_address)
+                if timing:
+                    marks['send_done_ns'] = time.monotonic_ns()
 
                 report_time = time.monotonic()
 
                 if report_time - last_report_time >= 0.5:
                     print(json.dumps(observation, allow_nan=False))
                     last_report_time = report_time
+                if timing:
+                    marks['console_done_ns'] = time.monotonic_ns()
 
                 cv2.imshow('Hand detection', frame)
 
-                if cv2.waitKey(1) & 0xFF == ord('q'):
+                key = cv2.waitKey(1) & 0xFF
+                if timing:
+                    marks['preview_done_ns'] = time.monotonic_ns()
+                    timing.record_frame(sample, observation, marks)
+                if key == ord('q'):
                     break
 
     finally:

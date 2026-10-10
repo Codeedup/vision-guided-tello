@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "runs": [
+    {
+      "run": "07",
+      "revision": "41e0dcd0eae643460f1d3704948305bb1b2657ad",
+      "cadence": "paced",
+      "sources": [
+        {
+          "filename": "operator-trace-07.json",
+          "sha256": "a0f8d40dc0655b97eda5a2a6989183044915979e69f9abea5f8b342a246051cf"
+        },
+        {
+          "filename": "bridge-trace-07.json",
+          "sha256": "2a640e80af531c6ef87cc146b2f9c032686c33cf3fee24679c2e9e1b3889bc87"
+        },
+        {
+          "filename": "webcam-lease-diagnostic-07.json",
+          "sha256": "263d1f0848323ba638cb1ae369931308e4de5b2659b5a3912ec58e8335450a25"
+        }
+      ],
+      "client_heartbeats": 125,
+      "client_successes": 125,
+      "correlated_server_heartbeats": 125,
+      "server_acceptances": 125,
+      "max_server_renewal_gap_ms": 81.442765,
+      "max_client_response_observation_delay_ms": 2.346038,
+      "first_fault": null,
+      "first_expiry": null,
+      "server_events_omitted": 10184,
+      "server_retains_entire_client_interval": true,
+      "neutral_policy_ticks_after_tracking": 0,
+      "bridge_completion": "shutdown",
+      "final_bridge_armed": false,
+      "monitor_duration_s": 60.000755636,
+      "nonneutral_messages_without_tracking": 0
+    },
+    {
+      "run": "08",
+      "revision": "41e0dcd0eae643460f1d3704948305bb1b2657ad",
+      "cadence": "paced",
+      "sources": [
+        {
+          "filename": "operator-trace-08.json",
+          "sha256": "87c25b003d8a9dc6f3dfc33c474a2e2eea4977b46093e7e3a24595139c233bd3"
+        },
+        {
+          "filename": "bridge-trace-08.json",
+          "sha256": "3a5747cc1ad3c73c666c49a28a883e31b3f9bdc7de61d652b0e878c873c31508"
+        },
+        {
+          "filename": "webcam-lease-diagnostic-08.json",
+          "sha256": "4b61561a9647785e605e33b2c29141d25c3a1b7ea851915ddb2f8328262188c1"
+        }
+      ],
+      "client_heartbeats": 125,
+      "client_successes": 125,
+      "correlated_server_heartbeats": 125,
+      "server_acceptances": 125,
+      "max_server_renewal_gap_ms": 82.289056,
+      "max_client_response_observation_delay_ms": 3.411296,
+      "first_fault": null,
+      "first_expiry": null,
+      "server_events_omitted": 123,
+      "server_retains_entire_client_interval": true,
+      "neutral_policy_ticks_after_tracking": 0,
+      "bridge_completion": "shutdown",
+      "final_bridge_armed": false,
+      "monitor_duration_s": 60.000475431,
+      "nonneutral_messages_without_tracking": 0
+    },
+    {
+      "run": "09",
+      "revision": "41e0dcd0eae643460f1d3704948305bb1b2657ad",
+      "cadence": "paced",
+      "sources": [
+        {
+          "filename": "operator-trace-09.json",
+          "sha256": "2169587031360a35cbabfafc0ca2f182bb0de2e00f99c9691cff912ad62dae7b"
+        },
+        {
+          "filename": "bridge-trace-09.json",
+          "sha256": "e067cba6062e6a68560e7ad4ab779b8570362fb6ff1dd1ce7162682739cb4a3b"
+        },
+        {
+          "filename": "webcam-lease-diagnostic-09.json",
+          "sha256": "86917769ad854a0ba62be30ce43439e85b6ece46fdad0b830350f799511ca19b"
+        }
+      ],
+      "client_heartbeats": 125,
+      "client_successes": 125,
+      "correlated_server_heartbeats": 125,
+      "server_acceptances": 125,
+      "max_server_renewal_gap_ms": 81.652181,
+      "max_client_response_observation_delay_ms": 3.046335,
+      "first_fault": null,
+      "first_expiry": null,
+      "server_events_omitted": 1823,
+      "server_retains_entire_client_interval": true,
+      "neutral_policy_ticks_after_tracking": 5,
+      "bridge_completion": "shutdown",
+      "final_bridge_armed": false,
+      "monitor_duration_s": 60.00087657,
+      "nonneutral_messages_without_tracking": 0
+    }
+  ],
+  "limitations": [
+    "Source reports were supplied by the user; hashes identify those attachments.",
+    "Full raw user reports are not stored in this summary.",
+    "Run 09 has five one-tick freshness pauses and is not uninterrupted tracking.",
+    "Server omissions precede the retained enabled interval.",
+    "Software-only FAKE evidence; no aircraft was actuated.",
+    "These runs do not establish the cause of the original run 05 stall."
+  ]
+}

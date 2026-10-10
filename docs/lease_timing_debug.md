@@ -1,6 +1,9 @@
 # FAKE operator lease diagnostics — 10 October 2026
 
-The current laptop blocker is an unlocalized heartbeat delay. The supplied run
+The current live checkpoint is three paced lease/cleanup passes, with five brief
+source-freshness neutral ticks in run 09. Continue with the
+[webcam perception timing diagnostic](perception_latency_debug.md). The historical
+laptop blocker below was an unlocalized heartbeat delay. The supplied run
 05 handoff records eligible input and supervisor TRACK, then bridge lease expiry:
 66.7 ms maximum client send gap and a 335.5 ms observed rejected-response delay.
 These are reported handoff measurements, not new measurements from this change.

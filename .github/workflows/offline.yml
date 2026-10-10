@@ -38,7 +38,7 @@ jobs:
       - name: Pure policies without ROS environment
         shell: bash
         run: |
-          PYTHONPATH=src/tello_bridge:tools/webcam_perception:tools/tello_diagnostics python3 -m pytest -q src/tello_bridge/test/test_boundary.py src/tello_bridge/test/test_timing.py tools/webcam_perception/test_measure_pipeline.py tools/webcam_perception/test_frame_sources.py tools/webcam_perception/test_open_palm.py tools/webcam_perception/test_model_asset.py tools/tello_diagnostics/test_diagnose.py
+          PYTHONPATH=src/tello_bridge:tools/webcam_perception:tools/tello_diagnostics python3 -m pytest -q src/tello_bridge/test/test_boundary.py src/tello_bridge/test/test_timing.py tools/webcam_perception/test_measure_pipeline.py tools/webcam_perception/test_frame_sources.py tools/webcam_perception/test_open_palm.py tools/webcam_perception/test_model_asset.py tools/webcam_perception/test_perception_timing.py tools/tello_diagnostics/test_diagnose.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
