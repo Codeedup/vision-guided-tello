@@ -34,11 +34,15 @@ def main():
 
     signal.signal(signal.SIGINT, request_stop)
     signal.signal(signal.SIGTERM, request_stop)
-    launch = subprocess.Popen([
+    launch_command = [
         'ros2', 'launch', 'tello_bridge', 'webcam.launch.py',
-        'namespace:=' + args.namespace, 'bind:=' + args.bind, 'port:=' + str(args.port),
-        'bridge_trace:=' + args.bridge_trace, 'trace_label:=' + args.trace_label],
-        start_new_session=True, env=launch_env)
+        'namespace:=' + args.namespace, 'bind:=' + args.bind, 'port:=' + str(args.port)]
+    # ROS CLI rejects name:= with no value; omitted options use launch defaults.
+    for name, value in (('bridge_trace', args.bridge_trace), ('trace_label', args.trace_label)):
+        if value:
+            launch_command.append(name + ':=' + value)
+    launch = subprocess.Popen(
+        launch_command, start_new_session=True, env=launch_env)
     print('Receiver/controller/supervisor/FAKE bridge; autonomy disabled. '
           'Ctrl+C requests takeover before stopping ROS.', flush=True)
     try:
@@ -69,3 +73,4 @@ def main():
 
 if __name__ == '__main__':
     raise SystemExit(main())
+
