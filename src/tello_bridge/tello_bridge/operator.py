@@ -10,6 +10,7 @@ import rclpy
 from rclpy.signals import SignalHandlerOptions
 from std_srvs.srv import SetBool, Trigger
 from tello_bridge.cadence import run_heartbeats
+import tello_bridge.timing as timing
 from tello_bridge.timing import source_hash, TimingTrace
 
 
@@ -60,9 +61,12 @@ def main(argv=None):
         nonlocal request_sequence
         client = get_client(path)
         ready(client, timeout)
-        sent_ns = time.monotonic_ns() if trace else None
         request_sequence += 1
-        future = client.call_async(request or Trigger.Request())
+        service_request = request or Trigger.Request()
+        if trace:
+            future, submission = timing.submit_service_request(client, service_request)
+        else:
+            future = client.call_async(service_request)
         deadline = time.monotonic() + timeout
         while not future.done() and time.monotonic() < deadline:
             rclpy.spin_once(node, timeout_sec=0.01)
@@ -77,8 +81,10 @@ def main(argv=None):
                 except (ValueError, TypeError):
                     pass
             trace.record('service_call', path=path, request_sequence=request_sequence,
-                         send_ns=sent_ns, response_observed_ns=observed_ns,
-                         observed_delay_ns=observed_ns - sent_ns, completed=complete,
+                         **submission, response_observed_ns=observed_ns,
+                         observed_delay_ns=observed_ns - submission['send_ns'],
+                         response_wait_ns=observed_ns - submission['submission_returned_ns'],
+                         completed=complete,
                          success=None if result is None else result.success, state=state,
                          timeout_s=timeout)
         if not complete or result is None:
@@ -129,6 +135,7 @@ def main(argv=None):
                                   'cadence': ('legacy' if args.legacy_heartbeat_cadence
                                               else 'paced'),
                                   'heartbeat_period_ns': 80000000,
+                                  'send_marker': 'before_call_async; not DDS/server receipt',
                                   'server_receipt_times': False})
             call('mission_manager/set_autonomy', SetBool.Request(data=False))
             if args.reset_mock:

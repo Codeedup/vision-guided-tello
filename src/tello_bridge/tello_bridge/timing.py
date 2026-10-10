@@ -10,6 +10,16 @@ import platform
 import time
 
 
+def submit_service_request(client, request, *, clock=time.monotonic_ns):
+    """Bracket call_async; return marks without implying DDS/server receipt."""
+    attempted_ns = clock()
+    future = client.call_async(request)
+    returned_ns = clock()
+    return future, {'send_ns': attempted_ns,
+                    'submission_returned_ns': returned_ns,
+                    'submission_duration_ns': returned_ns - attempted_ns}
+
+
 def snapshot(guard, mono_ns):
     """Capture authority at a callback boundary, never infer server receipt."""
     receipt = guard.operator_receipt_ns

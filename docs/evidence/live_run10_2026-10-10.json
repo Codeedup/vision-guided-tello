@@ -1,0 +1,71 @@
+{
+  "run": "10",
+  "revision": "0d5011f42cd18241edb967e185f5be8c750ed768",
+  "clock_check_wsl_minus_windows_ms": [
+    -0.15,
+    0.051
+  ],
+  "files_sha256": {
+    "bridge": "1a8a346772534d7e4373029e26113bbdb3797d9f0cd1f570c05ef2ce049f60de",
+    "operator": "2a8882d717a5a56e07bf307b8f7796fc5c16171e34179dec81cc5f4018995783",
+    "monitor": "c9b68087066cdadafdb4fcdc12af8bc278c72136c094ab0bfcd6c21af7b10bb3",
+    "sender": "a147cf8d7576640f02e233d2d92ec067697e582eb3c19336af491e684eff53de"
+  },
+  "result": "OPERATOR_LEASE_EXPIRED; not a tracking pass",
+  "heartbeat_attempt_interval_ms": 80.515166,
+  "second_attempt_to_bridge_callback_ms": 294.45165,
+  "second_callback_duration_ms": 0.104701,
+  "second_callback_end_to_client_observation_ms": 0.587841,
+  "lease_age_at_expiry_tick_ms": 319.470914,
+  "between_heartbeat_callbacks": {
+    "policy_ticks": 18,
+    "max_tick_gap_ms": 20.254984,
+    "max_tick_duration_ms": 0.335022
+  },
+  "sender": {
+    "completion": "quit",
+    "frames_retained": 1261,
+    "frames_omitted": 0,
+    "summary_ms": {
+      "inference": {
+        "samples": 1261,
+        "min": 9.9232,
+        "p50": 47.2841,
+        "p95": 91.445,
+        "p99": 99.65408000000004,
+        "max": 125.4958
+      },
+      "capture_to_send": {
+        "samples": 1261,
+        "min": 10.6613,
+        "p50": 49.462,
+        "p95": 93.5131,
+        "p99": 102.12690000000006,
+        "max": 128.4918
+      },
+      "send_gap": {
+        "samples": 1260,
+        "min": 14.1418,
+        "p50": 60.2031,
+        "p95": 118.56057999999999,
+        "p99": 131.24957,
+        "max": 160.1559
+      },
+      "between_frames": {
+        "samples": 1260,
+        "min": 0.028,
+        "p50": 0.08474999999999999,
+        "p95": 0.20728999999999992,
+        "p99": 0.3931630000000004,
+        "max": 2.5049
+      }
+    }
+  },
+  "bridge": {
+    "completion": "shutdown",
+    "events_retained": 20000,
+    "events_omitted": 37,
+    "enabled_interval_retained": true
+  },
+  "limits": "Client send_ns precedes call_async and is not proof of DDS delivery. Callback trace does not distinguish blocked client submission from delivery/dispatch delay. Sender stage elapsed time includes descheduling; correlation does not establish causation."
+}

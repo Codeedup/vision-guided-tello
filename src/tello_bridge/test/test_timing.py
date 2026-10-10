@@ -5,9 +5,49 @@ import json
 import pytest
 from tello_bridge.cadence import run_heartbeats
 from tello_bridge.policy import Authority, Command, Telemetry
+import tello_bridge.timing as timing
 from tello_bridge.timing import TimingTrace
 
 EPOCH = 1800000000000000000
+
+
+@pytest.mark.parametrize('submission_delay_ns', [0, 294000000])
+def test_submission_marks_separate_blocked_call_from_pending_response(submission_delay_ns):
+    now = 80000000
+    pending = object()
+    request = object()
+    requests = []
+
+    class Client:
+        def call_async(self, received):
+            nonlocal now
+            requests.append(received)
+            now += submission_delay_ns
+            return pending
+
+    future, marks = timing.submit_service_request(Client(), request, clock=lambda: now)
+    assert future is pending
+    assert requests == [request]
+    assert marks['send_ns'] == 80000000
+    assert marks['submission_returned_ns'] == 80000000 + submission_delay_ns
+    assert marks['submission_duration_ns'] == submission_delay_ns
+    # Waiting for a response after submission must not change the send interval.
+    now += 295000000
+    assert marks['submission_duration_ns'] == submission_delay_ns
+
+
+def test_submission_failure_propagates_without_retry():
+    requests = []
+
+    class Client:
+        def call_async(self, request):
+            requests.append(request)
+            raise RuntimeError('submission failed')
+
+    request = object()
+    with pytest.raises(RuntimeError, match='submission failed'):
+        timing.submit_service_request(Client(), request, clock=lambda: 0)
+    assert requests == [request]
 
 
 class VirtualClock:

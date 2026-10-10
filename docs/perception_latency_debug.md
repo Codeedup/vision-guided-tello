@@ -134,3 +134,68 @@ exercise the real sender loop without hardware. They check identical traced and
 untraced UDP observations, source stamps, stage attribution, bounded retention,
 nonoverwrite and completion on quit/error/interruption. Actual Windows webcam
 stage performance must be measured in the user run.
+
+## Run 10 result and run 11: heartbeat submission timing
+
+Run 10 at `0d5011f42cd18241edb967e185f5be8c750ed768` failed with
+`OPERATOR_LEASE_EXPIRED`. The supplied clock check bounded WSL minus Windows
+between -0.150 and +0.051 ms. All four reports are readable; sender completion
+was Q/quit with all 1,261 completed frames retained and no omissions. The bridge
+retained the complete enabled interval despite 37 omitted earlier events. See
+[evidence with source-report hashes](evidence/live_run10_2026-10-10.json).
+
+The first heartbeat renewed authority. The second client attempt began 80.515 ms
+later, but its bridge callback began 294.452 ms after that attempt. The callback
+itself took 0.105 ms; the client observed its rejection another 0.588 ms later.
+A policy tick had already latched landing at lease age 319.471 ms. Between the two
+heartbeat callbacks, bridge ticks continued with a maximum gap of 20.255 ms and
+maximum duration of 0.335 ms. This localizes the observed delay before heartbeat
+callback entry; it does not establish whether the client was blocked inside
+`call_async()`, the request was delayed in DDS, or service dispatch was delayed.
+The old client `send_ns` marker precedes `call_async()` and is not proof of delivery.
+
+Matched eligible camera frames around the failure spent approximately 95–100 ms
+in inference and 97–102 ms from software capture receipt to UDP send. Across the
+whole sender run, capture-to-send p95 was 93.513 ms and max 128.492 ms; send gap
+max was 160.156 ms. These reveal limited source freshness margin but do not
+explain the independent operator lease failure. This short enable failed before
+supervisor tracking acquisition; later supervisor TRACK flags cannot establish
+an armed bridge tracking pass. Final takeover status showed disarmed, upstream
+disabled, zero RC and a retained landing latch.
+
+The operator trace now preserves `send_ns` as the attempt marker and adds:
+
+- `submission_returned_ns`: immediately after `call_async()` returns its future.
+- `submission_duration_ns`: elapsed time inside that call, including scheduling.
+- `response_wait_ns`: submission return to client response observation, including
+  spinning, scheduling, response processing and result extraction.
+
+The two duration fields sum to the existing `observed_delay_ns`. Compare the
+bridge callback entry against both client marks using the same WSL monotonic
+clock. The server can process a request before `call_async()` returns, so do not
+interpret a negative callback-entry-minus-submission-return interval as clock
+failure. The service's existing timeout begins after submission and spin calls
+can return late; this diagnostic does not make it a strict wall-clock bound.
+Requests, pacing, authority rules and cleanup are unchanged. No automatic retry
+or rearm is added. A failed/interrupted submission still propagates through the
+existing cleanup; it cannot supply a completed service-call record.
+
+Run 11 repeats the four-terminal run 10 recipe above with new filenames and
+`heartbeat-submission-11` as the trace/monitor label. Stop the old processes,
+pull and rebuild the changed ROS package first:
+
+```bash
+cd ~/vision_guided_tello_ws
+git pull --ff-only
+source /opt/ros/jazzy/setup.bash
+colcon build --packages-select tello_bridge
+source install/local_setup.bash
+```
+
+Use `bridge-trace-11.json`, `operator-trace-11.json`,
+`webcam-lease-diagnostic-11.json` and Windows `webcam-timing-11.json`. Run the clock
+check again before starting the Windows preview. Keep the one eligible hand
+visible through the bounded enable and use the default paced client. Finish with
+explicit takeover/status, Q the preview and Ctrl+C the pipeline once, waiting
+for its prompt. Retain all four reports and console status even if the session
+fails. This is a FAKE measurement run, not a cleared real-aircraft test.

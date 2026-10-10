@@ -292,6 +292,12 @@ class TestLoopback(unittest.TestCase):
                           if event.get('path') == 'tello_bridge/heartbeat']
             self.assertGreaterEqual(len(heartbeats), 100)
             self.assertTrue(all(event['success'] for event in heartbeats))
+            for event in heartbeats:
+                self.assertLessEqual(event['send_ns'], event['submission_returned_ns'])
+                self.assertLessEqual(event['submission_returned_ns'],
+                                     event['response_observed_ns'])
+                self.assertEqual(event['submission_duration_ns'] + event['response_wait_ns'],
+                                 event['observed_delay_ns'])
             sends = [event['send_ns'] for event in heartbeats]
             self.assertTrue(all(b - a >= 75000000 for a, b in zip(sends, sends[1:])))
         finally:
