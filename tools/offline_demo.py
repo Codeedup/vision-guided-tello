@@ -63,17 +63,25 @@ def main():
                 if launch.poll() is not None or time.monotonic() >= deadline:
                     raise
                 time.sleep(0.1)
+        operator = start(['ros2', 'run', 'tello_bridge', 'tello_operator', 'enable',
+                          '--namespace', namespace, '--duration', str(args.duration + 5),
+                          '--reset-mock'],
+                         'operator.log')
+        ready_deadline = time.monotonic() + 20
+        operator_log = args.output / 'operator.log'
+        while 'Software session enabled;' not in operator_log.read_text():
+            if operator.poll() is not None or time.monotonic() >= ready_deadline:
+                raise RuntimeError('Operator did not enable; see operator.log')
+            time.sleep(0.02)
         monitor = start([sys.executable, str(ROOT / 'tools/webcam_perception/measure_pipeline.py'),
                          '--namespace', namespace, '--duration', str(args.duration),
                          '--source', 'synthetic', '--run-kind',
                          'baseline' if args.scenario == 'static' else 'fault',
                          '--configuration', json.dumps({'scenario': args.scenario,
                                                         'transport': 'fake',
-                                                        'plant': 'existing_image_plane_mock'}),
+                                                        'plant': 'existing_image_plane_mock',
+                                                        'monitor_start': 'after_enabled_marker'}),
                          '--output', str(args.output / 'report.json')], 'monitor.log')
-        operator = start(['ros2', 'run', 'tello_bridge', 'tello_operator', 'enable',
-                          '--namespace', namespace, '--duration', str(args.duration + 1)],
-                         'operator.log')
         # Bounded polling keeps the parent responsive to Ctrl+C.
         deadline = time.monotonic() + args.duration + 8
         while monitor.poll() is None and time.monotonic() < deadline:
@@ -84,6 +92,12 @@ def main():
             raise RuntimeError('Monitor failed; see monitor.log')
         if operator.poll() not in (None, 0):
             raise RuntimeError('Operator session failed; see operator.log')
+        report = json.loads((args.output / 'report.json').read_text())
+        approved = [row for row in report['message_records'] if row['topic'] == 'approved_command']
+        if args.scenario != 'stale' and not any(row['flags'][1] for row in approved):
+            raise RuntimeError('Demo did not observe tracking; preserve logs and retry diagnosis')
+        if args.scenario in ('loss', 'stale') and not any(row['flags'][2] for row in approved):
+            raise RuntimeError('Demo did not observe expected landing intent; preserve logs')
         print(command('status'))
         summary = subprocess.run([
             sys.executable, str(ROOT / 'tools/webcam_perception/summarize_report.py'),

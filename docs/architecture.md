@@ -47,6 +47,8 @@ The ROS bridge exposes private Trigger services `arm`, `heartbeat`, `disable`,
 existing mission manager SetBool `set_autonomy` and Trigger `manual_takeover`;
 only the latter services control the supervisor. `tello_operator` coordinates both.
 It revokes bridge authority before waiting for the supervisor takeover response.
+The synthetic demo can explicitly request `--reset-mock` through the original
+mock reset service after endpoint discovery. Normal launches never do this.
 Fake hover is an explicit synthetic lifecycle reset; it is never hardware evidence.
 The supervisor latch clears on takeover; the consumer landing latch does not.
 

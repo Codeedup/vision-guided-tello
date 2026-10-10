@@ -22,24 +22,34 @@ def main(argv=None):
     parser.add_argument('--namespace', default='/webcam_test')
     parser.add_argument('--duration', type=float, default=None,
                         help='Optional bounded enabled session, seconds')
+    parser.add_argument('--reset-mock', action='store_true',
+                        help='Explicit synthetic session: reset the mock before enable')
     args = parser.parse_args(argv)
     if args.duration is not None and not 0 < args.duration <= 600:
         parser.error('--duration must be in (0,600]')
+    if args.reset_mock and args.action != 'enable':
+        parser.error('--reset-mock requires enable')
     rclpy.init(args=[], signal_handler_options=SignalHandlerOptions.NO)
     signal.signal(signal.SIGINT, signal.default_int_handler)
     node = rclpy.create_node('tello_operator_' + str(os.getpid()), namespace=args.namespace)
     clients = {}
 
-    def call(path, request=None, timeout=5.0):
+    def get_client(path):
         kind = SetBool if 'set_autonomy' in path else Trigger
         if path not in clients:
             clients[path] = node.create_client(kind, path)
-        client = clients[path]
+        return clients[path]
+
+    def ready(client, timeout):
         discovery_deadline = time.monotonic() + timeout
         while not client.service_is_ready() and time.monotonic() < discovery_deadline:
             rclpy.spin_once(node, timeout_sec=0.02)
         if not client.service_is_ready():
             raise RuntimeError('Service unavailable: ' + client.service_name)
+
+    def call(path, request=None, timeout=5.0):
+        client = get_client(path)
+        ready(client, timeout)
         future = client.call_async(request or Trigger.Request())
         deadline = time.monotonic() + timeout
         while not future.done() and time.monotonic() < deadline:
@@ -64,16 +74,27 @@ def main(argv=None):
     enabled = False
     try:
         if args.action == 'enable':
-            # Complete heartbeat endpoint discovery before starting the short lease.
-            heartbeat_path = 'tello_bridge/heartbeat'
-            clients[heartbeat_path] = node.create_client(Trigger, heartbeat_path)
-            discovery_deadline = time.monotonic() + 5.0
-            while (not clients[heartbeat_path].service_is_ready()
-                   and time.monotonic() < discovery_deadline):
-                rclpy.spin_once(node, timeout_sec=0.02)
-            if not clients[heartbeat_path].service_is_ready():
-                raise RuntimeError('Heartbeat service unavailable')
+            # Discover all session/cleanup endpoints before starting the short lease.
+            paths = ['tello_bridge/heartbeat', 'tello_bridge/arm',
+                     'tello_bridge/manual_takeover', 'mission_manager/set_autonomy',
+                     'mission_manager/manual_takeover']
+            if args.reset_mock:
+                paths += ['tello_bridge/status', 'mock_tello/reset']
+            for path in paths:
+                ready(get_client(path), 5.0)
             call('mission_manager/set_autonomy', SetBool.Request(data=False))
+            if args.reset_mock:
+                if not json.loads(call('tello_bridge/status')).get('fake'):
+                    raise RuntimeError('Mock reset requires a fake bridge')
+                reset_deadline = time.monotonic() + 1.0
+                while True:
+                    try:
+                        call('mock_tello/reset')
+                        break
+                    except ServiceRejected:
+                        if time.monotonic() >= reset_deadline:
+                            raise
+                        rclpy.spin_once(node, timeout_sec=0.02)
             # Wait until bridge independently observes the disabled heartbeat.
             time_limit = time.monotonic() + 1.0
             while True:

@@ -30,6 +30,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(diagnostic_tests ${WEBCAM_TOOLS}/../tello_diagnostics
     APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}:${WEBCAM_TOOLS}/../tello_diagnostics
     TIMEOUT 60)
+  ament_add_pytest_test(synthetic_demo_tests test/test_demo.py TIMEOUT 120)
   add_launch_test(test/test_loopback_launch.py TIMEOUT 120
     RUNNER "${ament_cmake_ros_DIR}/run_test_isolated.py")
 endif()

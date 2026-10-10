@@ -89,7 +89,11 @@ python3 tools/offline_demo.py --scenario loss --output /tmp/tello-loss
 ```
 
 The runner reserves an isolated local ROS domain and uses the existing image-plane
-plant. It creates reports with commit, dirty state, environment, namespace,
+plant. Its explicit `--reset-mock` operator session finishes endpoint discovery,
+resets the original mock through its existing service, and then enables. The
+monitor starts after the enabled marker; initial enable/acquisition can precede
+its observation window and are tested separately. Missing expected tracking or
+landing evidence makes the demo fail. It creates reports with commit, dirty state, environment, namespace,
 configuration, baseline/fault kind and synthetic classification. Hardware publisher
 rate/camera throughput remain unknown. The mock reacts to the supervisor's approved
 command through its established consumer; the separate fake SDK boundary observes
