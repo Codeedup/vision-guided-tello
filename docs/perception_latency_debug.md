@@ -2,6 +2,12 @@
 
 ## Current evidence
 
+The latest run 11 completed the ten-second FAKE session with 125/125 accepted
+heartbeats, a maximum actual renewal gap of 80.699 ms, continuous bridge TRACKING
+after acquisition until takeover, and clean shutdown. See the [run 11
+result](#run-11-result-and-next-fake-test). Run 10's intermittent pre-callback
+heartbeat delay remains unresolved; run 11 did not reproduce it.
+
 User-supplied live webcam trials at `41e0dcd0eae643460f1d3704948305bb1b2657ad`
 completed three ten-second paced FAKE operator sessions. Each correlated all 125
 client heartbeats to accepted bridge callbacks. Maximum actual server renewal
@@ -199,3 +205,67 @@ visible through the bounded enable and use the default paced client. Finish with
 explicit takeover/status, Q the preview and Ctrl+C the pipeline once, waiting
 for its prompt. Retain all four reports and console status even if the session
 fails. This is a FAKE measurement run, not a cleared real-aircraft test.
+
+## Run 11 result and next FAKE test
+
+All four reports were supplied for run 11 at
+`a905b3eef2763900adbe42712841218c1f33d9b8`. The new client marks were present;
+the installed operator source hash matches this revision. Windows sender/module
+hashes, OpenCV/MediaPipe versions and 640 x 480 frame dimensions match run 10.
+The user subsequently reported that `git status --short` listed only the
+untracked `webcam-timing-10.json`; no tracked source changes were listed. This
+accounts for the monitor's dirty-tree flag without evidence of a source edit.
+The separate Windows/WSL clock-check line for run 11 is still pending.
+
+See the [machine-readable evidence](evidence/live_run11_2026-10-10.json) for raw
+report hashes and exact timings. The client attempted 125 heartbeats and all
+125 matched accepted bridge callbacks. The actual renewal gap max was 80.699 ms;
+client submission duration max was 0.280 ms, response wait max 1.407 ms and total
+response-observation delay max 1.587 ms. These are separate distribution maxima,
+not necessarily the same request. No lease expiry or landing fault was recorded.
+
+The enabled interval had nine neutral acquisition ticks followed by 491 TRACKING
+ticks, with no subsequent neutral ticks before takeover. Bridge TRACKING lasted
+9.813 seconds after acquisition. The maximum enabled policy-tick gap was 27.364 ms.
+Both operator cleanup services succeeded. The supplied final status was unarmed,
+upstream disabled, zero RC, HOVER_CONFIRMED, no landing latch and zero land attempts.
+The bridge report ended with shutdown and unarmed authority; its ring omitted
+471 earlier records but retains the complete enabled interval. Client, monitor
+and sender reports had no omissions; sender completion was Q/quit, with 2,286
+completed frames retained. The monitor reported all topics, no nonfinite values,
+no nonneutral messages without tracking and no ROS/monotonic elapsed warning.
+
+| Whole-report sender duration | Run 10 median / p95 | Run 11 median / p95 |
+| --- | --- | --- |
+| Inference | 47.284 / 91.445 ms | 22.177 / 43.483 ms |
+| Software capture receipt to UDP send | 49.462 / 93.513 ms | 23.108 / 44.819 ms |
+
+These whole-window distributions include different hand/no-hand periods and do
+not isolate the reason for improvement. In run 11's enabled interval, 298 unique
+sender frames matched bridge approved callbacks; capture-to-send max was
+48.187 ms and send-gap max 54.751 ms. The whole-report 161.862 ms capture-to-send
+max and 777.320 ms camera-read max were the first, ineligible startup frame,
+before enable. Do not misplace those maxima into the active tracking interval.
+Reported source age at tracking supervisor decisions peaked at 87.527 ms;
+Windows/WSL clock agreement still needs the separately requested clock check.
+
+No heartbeat stall occurred to localize with the new submission marks. The
+same sender software ran faster, but no controlled measurement isolates lighting,
+host scheduling, model workload or resource pressure. This passing run does not
+establish that the intermittent run 10 service delay is fixed.
+
+The next useful live FAKE trial is **run 12: controlled hand loss**. Use fresh
+`*-12.json` filenames and a `hand-loss-12` label with the four-terminal recipe.
+Start with one eligible hand and the normal continuously running paced operator.
+Allow tracking to acquire, then remove the hand while leaving the sender and
+operator running. Keep the hand absent through the configured 1.5-second loss
+interval and the landing latch. Keep the sender outside the hand pose until
+takeover to avoid confusing the first loss transition. Validate neutral RC,
+supervisor land intent, bridge disarm/latch and continuing healthy lease renewals
+until authority is revoked. A `SUPERVISOR_LAND` rejection intentionally ends the
+operator session with exit code 0; preserve the console state rather than using
+the exit code alone as the pass criterion. Then explicitly take over, capture
+status and finish/flush all four reports. Do not automatically rearm after loss.
+Use the reports to establish exact measured timing; hand movement timing by eye
+is not an exposure timestamp. A separate deliberate operator-loss trial follows
+after this result is reviewed.

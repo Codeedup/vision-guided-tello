@@ -1,5 +1,11 @@
 # FAKE operator lease diagnostics — 10 October 2026
 
+Run 11 passed the ten-second session with 125/125 accepted heartbeats, maximum
+actual renewal gap 80.699 ms and continuous bridge TRACKING after acquisition.
+Clean takeover/shutdown were verified. Run 10's intermittent delay remains
+unresolved. See the [latest evidence and next hand-loss
+trial](perception_latency_debug.md#run-11-result-and-next-fake-test).
+
 Run 10 reproduced expiry despite pacing: the second client attempt was on time,
 but its bridge heartbeat callback started 294.452 ms later. Bridge policy ticks
 continued at approximately 20 ms. See the [run 10 analysis and run 11
@@ -7,7 +13,7 @@ recipe](perception_latency_debug.md#run-10-result-and-run-11-heartbeat-submissio
 The new client marks bracket `call_async()` to distinguish submission elapsed time
 from the subsequent response-observation interval. Neither proves DDS delivery.
 
-The current live checkpoint is three paced lease/cleanup passes, with five brief
+The earlier runs 07–09 completed three paced lease/cleanup passes, with five brief
 source-freshness neutral ticks in run 09. Continue with the
 [webcam perception timing diagnostic](perception_latency_debug.md). The historical
 laptop blocker below was an unlocalized heartbeat delay. The supplied run

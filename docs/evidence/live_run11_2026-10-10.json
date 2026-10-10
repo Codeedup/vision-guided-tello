@@ -1,0 +1,88 @@
+{
+  "run": "11",
+  "revision": "a905b3eef2763900adbe42712841218c1f33d9b8",
+  "result": "ten-second FAKE session passed; continuous bridge tracking after acquisition",
+  "clock_check_wsl_minus_windows_ms": null,
+  "clock_check_status": "separate run 11 check line requested but not supplied",
+  "files_sha256": {
+    "bridge": "474c9c19fdb3d9b7b0b1b661d3c0ee5f843e4d8d4c377d31e3052f4481f4d278",
+    "operator": "6a3c308c47278179e3e8717b9bf1e25a21e1879f22574eb80398dc7cc063515d",
+    "monitor": "51f43da52b9e8679abdc8a2eb5bf6f77fe74e5dee6129f75c53d62ce624a92ff",
+    "sender": "2325dcf228d7a1b34b9ece870a7d3052d913468c05cc714b0cbf4cfb5fb5c0cf"
+  },
+  "source_identity": {
+    "operator_sha256": "f3b0550c60d13d7e25aa563a94ea5a15fe09e96b80c72d8e528a06344687e86b",
+    "hand_preview_sha256": "dafee7c294fb75c65b0fe332084d09c6d891546d0158bbe01560da384f560882",
+    "timing_sha256": "b9a02ec7c451cb2cde4d5e270e607c6ac7d10698b8d1d14c28e9820e62f473cd",
+    "opencv": "5.0.0",
+    "mediapipe": "1.1.0",
+    "monitor_working_tree_dirty": true,
+    "user_subsequent_git_status_short": "?? webcam-timing-10.json",
+    "tracked_changes_in_supplied_git_status": false
+  },
+  "heartbeats": {
+    "client_attempts": 125,
+    "matched_server_callbacks": 125,
+    "accepted": 125,
+    "max_actual_renewal_gap_ms": 80.699135,
+    "max_client_attempt_gap_ms": 80.472875,
+    "max_submission_duration_ms": 0.279659,
+    "max_response_wait_ms": 1.406865,
+    "max_observed_delay_ms": 1.586803
+  },
+  "bridge": {
+    "completion": "shutdown",
+    "first_fault": null,
+    "first_expiry": null,
+    "events_omitted": 471,
+    "enabled_interval_retained": true,
+    "acquisition_neutral_ticks": 9,
+    "tracking_ticks_after_acquisition": 491,
+    "neutral_ticks_after_acquisition": 0,
+    "tracking_until_takeover_s": 9.812538221,
+    "max_enabled_tick_gap_ms": 27.364252,
+    "final_shutdown_armed": false
+  },
+  "sender": {
+    "completion": "quit",
+    "frames_retained": 2286,
+    "frames_omitted": 0,
+    "summary_ms": {
+      "inference": {
+        "samples": 2286,
+        "min": 9.6434,
+        "p50": 22.17725,
+        "p95": 43.4833,
+        "p99": 66.94426000000004,
+        "max": 91.9741
+      },
+      "capture_to_send": {
+        "samples": 2286,
+        "min": 10.4685,
+        "p50": 23.1081,
+        "p95": 44.81855,
+        "p99": 68.70525000000008,
+        "max": 161.8619
+      },
+      "send_gap": {
+        "samples": 2285,
+        "min": 16.3246,
+        "p50": 33.8574,
+        "p95": 69.34505999999996,
+        "p99": 93.83283199999997,
+        "max": 139.0492
+      }
+    },
+    "matched_unique_frames_during_enabled_interval": 298,
+    "max_enabled_capture_to_send_ms": 48.1867,
+    "max_enabled_send_gap_ms": 54.7513
+  },
+  "monitor": {
+    "missing_topics": [],
+    "source_age_clock_warning": false,
+    "nonfinite_values": 0,
+    "nonneutral_without_tracking": 0,
+    "records_omitted": 0
+  },
+  "limitations": "No stall reproduced; root cause of run 10 delay is unresolved. Whole-window sender distributions have different hand/no-hand mixtures and do not identify the cause of improvement. Run 11 Windows/WSL clock check line remains pending. Software FAKE evidence only. Raw reports retained by the user; hashes identify the supplied files."
+}
