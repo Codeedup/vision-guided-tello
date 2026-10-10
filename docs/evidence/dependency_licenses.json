@@ -1,0 +1,202 @@
+[
+  {
+    "name": "absl-py",
+    "version": "2.5.1",
+    "license_expression": "Apache-2.0",
+    "license_label": null,
+    "license_classifiers": [
+      "License :: OSI Approved :: Apache Software License"
+    ],
+    "license_text_present": false,
+    "basis": "installed distribution metadata; not a redistribution clearance"
+  },
+  {
+    "name": "certifi",
+    "version": "2026.7.22",
+    "license_expression": null,
+    "license_label": "MPL-2.0",
+    "license_classifiers": [
+      "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)"
+    ],
+    "license_text_present": true,
+    "basis": "installed distribution metadata; not a redistribution clearance"
+  },
+  {
+    "name": "cffi",
+    "version": "2.1.1",
+    "license_expression": "MIT-0",
+    "license_label": null,
+    "license_classifiers": [],
+    "license_text_present": false,
+    "basis": "installed distribution metadata; not a redistribution clearance"
+  },
+  {
+    "name": "contourpy",
+    "version": "1.4.0",
+    "license_expression": "BSD-3-Clause",
+    "license_label": null,
+    "license_classifiers": [],
+    "license_text_present": false,
+    "basis": "installed distribution metadata; not a redistribution clearance"
+  },
+  {
+    "name": "cycler",
+    "version": "0.12.1",
+    "license_expression": null,
+    "license_label": null,
+    "license_classifiers": [
+      "License :: OSI Approved :: BSD License"
+    ],
+    "license_text_present": true,
+    "basis": "installed distribution metadata; not a redistribution clearance"
+  },
+  {
+    "name": "flatbuffers",
+    "version": "25.12.19",
+    "license_expression": null,
+    "license_label": "Apache 2.0",
+    "license_classifiers": [
+      "License :: OSI Approved :: Apache Software License"
+    ],
+    "license_text_present": true,
+    "basis": "installed distribution metadata; not a redistribution clearance"
+  },
+  {
+    "name": "fonttools",
+    "version": "4.66.1",
+    "license_expression": null,
+    "license_label": "MIT",
+    "license_classifiers": [],
+    "license_text_present": true,
+    "basis": "installed distribution metadata; not a redistribution clearance"
+  },
+  {
+    "name": "kiwisolver",
+    "version": "1.5.1",
+    "license_expression": null,
+    "license_label": null,
+    "license_classifiers": [
+      "License :: OSI Approved :: BSD License"
+    ],
+    "license_text_present": true,
+    "basis": "installed distribution metadata; not a redistribution clearance"
+  },
+  {
+    "name": "matplotlib",
+    "version": "3.11.2",
+    "license_expression": null,
+    "license_label": null,
+    "license_classifiers": [
+      "License :: OSI Approved :: Python Software Foundation License"
+    ],
+    "license_text_present": true,
+    "basis": "installed distribution metadata; not a redistribution clearance"
+  },
+  {
+    "name": "mediapipe",
+    "version": "1.1.0",
+    "license_expression": null,
+    "license_label": "Apache 2.0",
+    "license_classifiers": [
+      "License :: OSI Approved :: Apache Software License"
+    ],
+    "license_text_present": true,
+    "basis": "installed distribution metadata; not a redistribution clearance"
+  },
+  {
+    "name": "numpy",
+    "version": "2.5.3",
+    "license_expression": "BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0",
+    "license_label": null,
+    "license_classifiers": [],
+    "license_text_present": false,
+    "basis": "installed distribution metadata; not a redistribution clearance"
+  },
+  {
+    "name": "opencv-contrib-python",
+    "version": "5.0.0.93",
+    "license_expression": null,
+    "license_label": "Apache 2.0",
+    "license_classifiers": [
+      "License :: OSI Approved :: Apache Software License"
+    ],
+    "license_text_present": true,
+    "basis": "installed distribution metadata; not a redistribution clearance"
+  },
+  {
+    "name": "packaging",
+    "version": "26.3",
+    "license_expression": "Apache-2.0 OR BSD-2-Clause",
+    "license_label": null,
+    "license_classifiers": [],
+    "license_text_present": false,
+    "basis": "installed distribution metadata; not a redistribution clearance"
+  },
+  {
+    "name": "pillow",
+    "version": "12.3.0",
+    "license_expression": "MIT-CMU",
+    "license_label": null,
+    "license_classifiers": [],
+    "license_text_present": false,
+    "basis": "installed distribution metadata; not a redistribution clearance"
+  },
+  {
+    "name": "pycparser",
+    "version": "3.11",
+    "license_expression": "BSD-3-Clause",
+    "license_label": null,
+    "license_classifiers": [],
+    "license_text_present": false,
+    "basis": "installed distribution metadata; not a redistribution clearance"
+  },
+  {
+    "name": "pyparsing",
+    "version": "3.3.3",
+    "license_expression": "MIT",
+    "license_label": null,
+    "license_classifiers": [],
+    "license_text_present": false,
+    "basis": "installed distribution metadata; not a redistribution clearance"
+  },
+  {
+    "name": "python-dateutil",
+    "version": "2.9.0.post0",
+    "license_expression": null,
+    "license_label": "Dual License",
+    "license_classifiers": [
+      "License :: OSI Approved :: BSD License",
+      "License :: OSI Approved :: Apache Software License"
+    ],
+    "license_text_present": true,
+    "basis": "installed distribution metadata; not a redistribution clearance"
+  },
+  {
+    "name": "six",
+    "version": "1.17.0",
+    "license_expression": null,
+    "license_label": "MIT",
+    "license_classifiers": [
+      "License :: OSI Approved :: MIT License"
+    ],
+    "license_text_present": true,
+    "basis": "installed distribution metadata; not a redistribution clearance"
+  },
+  {
+    "name": "sounddevice",
+    "version": "0.5.6",
+    "license_expression": "MIT",
+    "license_label": null,
+    "license_classifiers": [],
+    "license_text_present": false,
+    "basis": "installed distribution metadata; not a redistribution clearance"
+  },
+  {
+    "name": "av",
+    "version": "19.0.1",
+    "license_expression": "BSD-3-Clause",
+    "license_label": null,
+    "license_classifiers": [],
+    "basis": "installed wheel metadata; bundled FFmpeg/codec licence audit remains open"
+  }
+]

@@ -1,5 +1,9 @@
 # Dependency, SDK and fixture provenance
 
+Installed candidate dependency licence expressions/classifiers are recorded in
+[evidence/dependency_licenses.json](evidence/dependency_licenses.json). These are
+distribution metadata, not redistribution clearance for bundled codecs or models.
+
 The source checkpoint was `1a16868`, with a clean working tree on `main`.
 All new fixture pixels and landmarks are synthetic, authored within the tests.
 No user recordings, secrets, downloaded SDK source, venv or generated ROS tree

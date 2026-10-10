@@ -1,0 +1,325 @@
+{
+  "date": "2026-10-10",
+  "timezone": "Europe/London",
+  "validated_code_commit": "75de0905974349535266a3037e8982ecb721148a",
+  "branch": "codex/offline-preparation-2026-10-10",
+  "aggregate_result": "Summary: 344 tests, 0 errors, 0 failures, 10 skipped",
+  "verification_sequence": [
+    "tools/run_offline_checks.sh (full workspace; monitor interruption readiness race identified)",
+    "colcon build --packages-select tello_bridge",
+    "colcon test --packages-select tello_bridge --event-handlers console_direct+ (all behaviour suites passed after readiness fix)",
+    "colcon test --packages-select tello_bridge --ctest-args -R '^flake8$' --event-handlers console_direct+ (formatting-only final recheck)",
+    "colcon test-result --verbose"
+  ],
+  "resolved_test_issue": "Ctrl+C test waits for actual receipt on all topics, not solely subscription construction; production QoS unchanged.",
+  "pure_tests_without_ros": {
+    "tests": 110,
+    "result": "passed",
+    "overlap": "Selection of registered suites; do not add to aggregate count"
+  },
+  "other_checks": {
+    "monitor_embedded_tests": 10,
+    "decoder_fixture": "PyAV 19.0.1 actual generated FFV1 decode passed",
+    "clean_linux_model_load": "passed without camera",
+    "windows_cp314_wheels": "resolved; runtime unrun",
+    "startup_diagnostics_and_sigint_cleanup": "passed, isolated loopback bind/ephemeral port",
+    "fake_diagnostic": "passed including video cleanup allowlist",
+    "python_compilation": "passed",
+    "shell_syntax": "passed",
+    "git_diff_check": "passed"
+  },
+  "skips": {
+    "count": 10,
+    "reason": "Installed ament wrapper refuses cppcheck 2.13.0 due known performance issues",
+    "cases": [
+      {
+        "package": "mission_manager",
+        "case": "include/mission_manager/candidate_safety.hpp"
+      },
+      {
+        "package": "mission_manager",
+        "case": "include/mission_manager/supervisor.hpp"
+      },
+      {
+        "package": "mission_manager",
+        "case": "src/mission_manager_node.cpp"
+      },
+      {
+        "package": "mission_manager",
+        "case": "test/candidate_safety_tests.cpp"
+      },
+      {
+        "package": "mission_manager",
+        "case": "test/supervisor_tests.cpp"
+      },
+      {
+        "package": "tracking_controller",
+        "case": "include/tracking_controller/controller.hpp"
+      },
+      {
+        "package": "tracking_controller",
+        "case": "include/tracking_controller/target_safety.hpp"
+      },
+      {
+        "package": "tracking_controller",
+        "case": "src/controller_demo.cpp"
+      },
+      {
+        "package": "tracking_controller",
+        "case": "src/tracking_controller_node.cpp"
+      },
+      {
+        "package": "tracking_controller",
+        "case": "test/controller_tests.cpp"
+      }
+    ]
+  },
+  "unrun": [
+    "Hosted GitHub Actions",
+    "Windows runtime / live webcam",
+    "Sustained live/load acceptance",
+    "All aircraft networking, SDK/video, operator, battery and flight tests"
+  ],
+  "synthetic_runs": {
+    "baseline": {
+      "summary": {
+        "metadata": {
+          "commit": "d191fcd2cde14bcd48bdfab4e554f34062bbf94c",
+          "working_tree_dirty": false,
+          "run_kind": "baseline",
+          "source_classification": "synthetic",
+          "label": "",
+          "configuration": {
+            "scenario": "static",
+            "transport": "fake",
+            "plant": "existing_image_plane_mock",
+            "monitor_start": "after_enabled_marker"
+          },
+          "environment": {
+            "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+            "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+            "ros_distro": "jazzy",
+            "ros_domain_id": "2",
+            "rmw_implementation": null
+          }
+        },
+        "observed_duration_s": 8.000332033,
+        "warnings": [
+          "hand_target: flagged_usable_messages_with_source_age_ge_250ms_at_monitor=1",
+          "candidate_command: flagged_usable_messages_with_source_age_ge_250ms_at_monitor=2",
+          "approved_command: flagged_usable_messages_with_source_age_ge_250ms_at_monitor=5"
+        ],
+        "topics": {
+          "hand_target": {
+            "received_hz": 13.999418966365294,
+            "advancing_source_hz": 13.999418966365294,
+            "advancing_source_age_ms": {
+              "sampled": 112,
+              "total": 112,
+              "omitted": 0,
+              "min": 10.124532,
+              "p50": 10.837145,
+              "p95": 11.29887105,
+              "p99": 244.32336005000002,
+              "max": 298.767344
+            }
+          },
+          "candidate_command": {
+            "received_hz": 14.874382651763124,
+            "advancing_source_hz": 14.874382651763124,
+            "advancing_source_age_ms": {
+              "sampled": 119,
+              "total": 119,
+              "omitted": 0,
+              "min": 10.545861,
+              "p50": 11.217227,
+              "p95": 11.850861799999999,
+              "p99": 241.37608249999965,
+              "max": 298.90639
+            }
+          },
+          "approved_command": {
+            "received_hz": 36.62347997450921,
+            "advancing_source_hz": 14.999377463962814,
+            "advancing_source_age_ms": {
+              "sampled": 120,
+              "total": 120,
+              "omitted": 0,
+              "min": 15.265433,
+              "p50": 25.464779,
+              "p95": 26.194702550000002,
+              "p99": 240.9983295500001,
+              "max": 299.179564
+            }
+          }
+        },
+        "publisher_rate_hz": null,
+        "camera_throughput_fps": null
+      },
+      "transitions": [],
+      "audit": {
+        "tracking_observed": true,
+        "landing_intent_observed": false,
+        "nonneutral_messages_without_tracking": 0,
+        "maximum_tracking_source_age_at_supervisor_decision_ms_from_headers": 55.193898,
+        "message_records_omitted": 0,
+        "state_transitions_omitted": 0
+      },
+      "local_raw_report": "/tmp/tello-evidence-baseline-d191fcd/report.json"
+    },
+    "loss": {
+      "summary": {
+        "metadata": {
+          "commit": "d191fcd2cde14bcd48bdfab4e554f34062bbf94c",
+          "working_tree_dirty": false,
+          "run_kind": "fault",
+          "source_classification": "synthetic",
+          "label": "",
+          "configuration": {
+            "scenario": "loss",
+            "transport": "fake",
+            "plant": "existing_image_plane_mock",
+            "monitor_start": "after_enabled_marker"
+          },
+          "environment": {
+            "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+            "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+            "ros_distro": "jazzy",
+            "ros_domain_id": "1",
+            "rmw_implementation": null
+          }
+        },
+        "observed_duration_s": 8.000324864,
+        "warnings": [],
+        "topics": {
+          "hand_target": {
+            "received_hz": 19.874192948772738,
+            "advancing_source_hz": 19.874192948772738,
+            "advancing_source_age_ms": {
+              "sampled": 159,
+              "total": 159,
+              "omitted": 0,
+              "min": 9.923399,
+              "p50": 10.655645,
+              "p95": 11.3631745,
+              "p99": 11.55649758,
+              "max": 11.629943
+            }
+          },
+          "candidate_command": {
+            "received_hz": 19.874192948772738,
+            "advancing_source_hz": 19.874192948772738,
+            "advancing_source_age_ms": {
+              "sampled": 159,
+              "total": 159,
+              "omitted": 0,
+              "min": 10.153059,
+              "p50": 11.024692,
+              "p95": 11.6608077,
+              "p99": 11.84837782,
+              "max": 11.942745
+            }
+          },
+          "approved_command": {
+            "received_hz": 62.49746210305892,
+            "advancing_source_hz": 6.37474113451201,
+            "advancing_source_age_ms": {
+              "sampled": 51,
+              "total": 51,
+              "omitted": 0,
+              "min": 19.728693,
+              "p50": 30.014523,
+              "p95": 30.7896115,
+              "p99": 35.4884055,
+              "max": 39.985194
+            }
+          }
+        },
+        "publisher_rate_hz": null,
+        "camera_throughput_fps": null
+      },
+      "transitions": [
+        {
+          "topic": "hand_target",
+          "elapsed_s": 2.575359749,
+          "previous": [
+            true,
+            1
+          ],
+          "current": [
+            false,
+            0
+          ],
+          "source_stamp_ns": 1791641495564364800,
+          "source_age_ms_at_transition": 10.639108,
+          "since_observed_tracking_loss_ms": null,
+          "since_last_flagged_usable_hand_target_receipt_ms": 49.951521,
+          "since_last_flagged_usable_candidate_command_receipt_ms": 49.611171
+        },
+        {
+          "topic": "candidate_command",
+          "elapsed_s": 2.575787757,
+          "previous": [
+            true
+          ],
+          "current": [
+            false
+          ],
+          "source_stamp_ns": 1791641495564364800,
+          "source_age_ms_at_transition": 11.067329,
+          "since_observed_tracking_loss_ms": null,
+          "since_last_flagged_usable_hand_target_receipt_ms": 50.379529,
+          "since_last_flagged_usable_candidate_command_receipt_ms": 50.039179
+        },
+        {
+          "topic": "approved_command",
+          "elapsed_s": 2.575897694,
+          "previous": [
+            true,
+            true,
+            false
+          ],
+          "current": [
+            true,
+            false,
+            false
+          ],
+          "source_stamp_ns": 1791641495514229504,
+          "source_age_ms_at_transition": 61.312219,
+          "since_observed_tracking_loss_ms": 0.0,
+          "since_last_flagged_usable_hand_target_receipt_ms": 50.489466,
+          "since_last_flagged_usable_candidate_command_receipt_ms": 50.149116
+        },
+        {
+          "topic": "approved_command",
+          "elapsed_s": 4.076219213,
+          "previous": [
+            true,
+            false,
+            false
+          ],
+          "current": [
+            true,
+            false,
+            true
+          ],
+          "source_stamp_ns": 1791641495514229504,
+          "source_age_ms_at_transition": 1561.634664,
+          "since_observed_tracking_loss_ms": 1500.321519,
+          "since_last_flagged_usable_hand_target_receipt_ms": 1550.810985,
+          "since_last_flagged_usable_candidate_command_receipt_ms": 1550.470635
+        }
+      ],
+      "audit": {
+        "tracking_observed": true,
+        "landing_intent_observed": true,
+        "nonneutral_messages_without_tracking": 0,
+        "maximum_tracking_source_age_at_supervisor_decision_ms_from_headers": 59.711768,
+        "message_records_omitted": 0,
+        "state_transitions_omitted": 0
+      },
+      "local_raw_report": "/tmp/tello-evidence-loss-d191fcd/report.json"
+    }
+  },
+  "observer_warning_interpretation": "Concurrent regression/demo load yielded some usable-flagged messages older than 250 ms at monitor receipt. Retained approved headers were fresh at supervisor decision (maximum about 55.2 ms). Monitor delivery age is not upstream decision age or physical stop measurement. Sustained-load acceptance remains open."
+}
