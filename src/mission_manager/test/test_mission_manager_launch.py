@@ -1,24 +1,23 @@
 import time
 import unittest
 
+from drone_interfaces.msg import ApprovedCommand, CandidateCommand
 import launch
 import launch_ros.actions
 import launch_testing
 import launch_testing.actions
 import launch_testing.asserts
 import rclpy
-
-from drone_interfaces.msg import ApprovedCommand, CandidateCommand
 from std_srvs.srv import SetBool, Trigger
 
 
 def generate_test_description():
     mission_manager = launch_ros.actions.Node(
-        package="mission_manager",
-        executable="mission_manager_node",
-        namespace="approved_output_test",
-        parameters=[{"use_sim_time": False}],
-        output="screen",
+        package='mission_manager',
+        executable='mission_manager_node',
+        namespace='approved_output_test',
+        parameters=[{'use_sim_time': False}],
+        output='screen',
     )
 
     return (
@@ -26,7 +25,7 @@ def generate_test_description():
             mission_manager,
             launch_testing.actions.ReadyToTest(),
         ]),
-        {"mission_manager": mission_manager},
+        {'mission_manager': mission_manager},
     )
 
 
@@ -35,15 +34,15 @@ class TestApprovedOutput(unittest.TestCase):
     def setUpClass(cls):
         rclpy.init()
         cls.node = rclpy.create_node(
-            "approved_output_probe",
-            namespace="approved_output_test",
+            'approved_output_probe',
+            namespace='approved_output_test',
         )
 
         cls.messages = []
 
         cls.subscription = cls.node.create_subscription(
             ApprovedCommand,
-            "approved_command",
+            'approved_command',
             lambda message: cls.messages.append(
                 (time.monotonic(), message)
             ),
@@ -52,18 +51,18 @@ class TestApprovedOutput(unittest.TestCase):
 
         cls.publisher = cls.node.create_publisher(
             CandidateCommand,
-            "candidate_command",
+            'candidate_command',
             1,
         )
 
         cls.autonomy_client = cls.node.create_client(
             SetBool,
-            "mission_manager/set_autonomy",
+            'mission_manager/set_autonomy',
         )
 
         cls.takeover_client = cls.node.create_client(
             Trigger,
-            "mission_manager/manual_takeover",
+            'mission_manager/manual_takeover',
         )
 
     @classmethod
@@ -90,7 +89,7 @@ class TestApprovedOutput(unittest.TestCase):
         future = client.call_async(request)
 
         completed = self.wait_until(future.done, timeout=2.0)
-        self.assertTrue(completed, "Operator service did not respond")
+        self.assertTrue(completed, 'Operator service did not respond')
 
         response = future.result()
         self.assertIsNotNone(response)
@@ -107,7 +106,7 @@ class TestApprovedOutput(unittest.TestCase):
             ),
             timeout=5.0,
         )
-        self.assertTrue(discovered, "Node interfaces not discovered")
+        self.assertTrue(discovered, 'Node interfaces not discovered')
 
         self.call_service(self.takeover_client, Trigger.Request())
         self.messages.clear()
@@ -120,7 +119,7 @@ class TestApprovedOutput(unittest.TestCase):
             ),
             timeout=3.0,
         )
-        self.assertTrue(continued, "Approved heartbeat did not continue")
+        self.assertTrue(continued, 'Approved heartbeat did not continue')
 
         for _, message in self.messages:
             self.assertFalse(message.autonomy_enabled)
@@ -133,7 +132,7 @@ class TestApprovedOutput(unittest.TestCase):
             self.assertEqual(
                 self.stamp_ns(message.source_header.stamp), 0
             )
-            self.assertEqual(message.source_header.frame_id, "")
+            self.assertEqual(message.source_header.frame_id, '')
 
         first = self.messages[0][1]
         last = self.messages[-1][1]
@@ -141,7 +140,7 @@ class TestApprovedOutput(unittest.TestCase):
         self.assertGreater(
             self.stamp_ns(last.header.stamp),
             self.stamp_ns(first.header.stamp),
-            "Publication timestamp did not advance",
+            'Publication timestamp did not advance',
         )
 
     def test_fresh_candidates_produce_approved_motion(self):
@@ -150,7 +149,7 @@ class TestApprovedOutput(unittest.TestCase):
         def publish_candidate():
             candidate = CandidateCommand()
             candidate.header.stamp = self.node.get_clock().now().to_msg()
-            candidate.header.frame_id = "test_camera"
+            candidate.header.frame_id = 'test_camera'
             candidate.target_valid = True
             candidate.lateral = 5.0
             candidate.vertical = -3.0
@@ -182,7 +181,7 @@ class TestApprovedOutput(unittest.TestCase):
             )
             self.assertTrue(
                 acquired,
-                "Fresh candidates did not produce approved motion",
+                'Fresh candidates did not produce approved motion',
             )
 
             approved = matching_outputs()[0]
@@ -193,7 +192,7 @@ class TestApprovedOutput(unittest.TestCase):
             self.assertEqual(approved.lateral, 5.0)
             self.assertEqual(approved.vertical, -3.0)
             self.assertEqual(
-                approved.source_header.frame_id, "test_camera"
+                approved.source_header.frame_id, 'test_camera'
             )
 
             self.assertGreaterEqual(
@@ -230,7 +229,7 @@ class TestApprovedOutput(unittest.TestCase):
             )
             self.assertTrue(
                 continued,
-                "Output or fresh input did not continue after takeover",
+                'Output or fresh input did not continue after takeover',
             )
 
             for _, message in outputs_after_takeover():
@@ -243,13 +242,14 @@ class TestApprovedOutput(unittest.TestCase):
         finally:
             self.node.destroy_timer(timer)
             self.call_service(self.takeover_client, Trigger.Request())
+
     def test_input_silence_produces_neutral_then_landing(self):
         sent_stamps = set()
 
         def publish_candidate():
             candidate = CandidateCommand()
             candidate.header.stamp = self.node.get_clock().now().to_msg()
-            candidate.header.frame_id = "loss_test_camera"
+            candidate.header.frame_id = 'loss_test_camera'
             candidate.target_valid = True
             candidate.lateral = 5.0
             candidate.vertical = -3.0
@@ -273,7 +273,7 @@ class TestApprovedOutput(unittest.TestCase):
                 ),
                 timeout=2.0,
             )
-            self.assertTrue(acquired, "Tracking was not acquired")
+            self.assertTrue(acquired, 'Tracking was not acquired')
 
             # Stop input while leaving the supervisor running.
             self.node.destroy_timer(timer)
@@ -300,7 +300,7 @@ class TestApprovedOutput(unittest.TestCase):
             )
             self.assertTrue(
                 neutral_received,
-                "Input silence did not produce pre-landing neutral output",
+                'Input silence did not produce pre-landing neutral output',
             )
 
             neutral = neutral_outputs()[0]
@@ -326,7 +326,7 @@ class TestApprovedOutput(unittest.TestCase):
             )
             self.assertTrue(
                 landing_received,
-                "Sustained input silence did not request landing",
+                'Sustained input silence did not request landing',
             )
 
             landing = landing_outputs()[0]
@@ -341,14 +341,14 @@ class TestApprovedOutput(unittest.TestCase):
             )
             self.assertEqual(
                 landing.source_header.frame_id,
-                "loss_test_camera",
+                'loss_test_camera',
             )
             self.assertGreater(
                 self.stamp_ns(landing.header.stamp),
                 self.stamp_ns(neutral.header.stamp),
             )
 
-                        # Resume fresh input while landing remains latched.
+            # Resume fresh input while landing remains latched.
             timer = self.node.create_timer(0.05, publish_candidate)
 
             # Neither ordinary disable nor enable may clear the latch.
@@ -359,14 +359,14 @@ class TestApprovedOutput(unittest.TestCase):
 
                 self.assertTrue(
                     self.wait_until(future.done, timeout=2.0),
-                    "Autonomy service did not respond",
+                    'Autonomy service did not respond',
                 )
 
                 response = future.result()
                 self.assertIsNotNone(response)
                 self.assertFalse(
                     response.success,
-                    "Ordinary service request cleared the landing latch",
+                    'Ordinary service request cleared the landing latch',
                 )
 
             cutoff_ns = self.node.get_clock().now().nanoseconds
@@ -393,7 +393,7 @@ class TestApprovedOutput(unittest.TestCase):
                     continued_with_fresh_input,
                     timeout=2.0,
                 ),
-                "Fresh input or latched output did not continue",
+                'Fresh input or latched output did not continue',
             )
 
             for _, message in outputs_after_requests():
@@ -412,15 +412,15 @@ class TestApprovedOutput(unittest.TestCase):
     def test_invalid_candidates_block_approved_motion(self):
         # name, target_valid, lateral, vertical, timestamp condition
         cases = [
-            ("invalid_target", False, 5.0, -3.0, "fresh"),
-            ("missing_stamp", True, 5.0, -3.0, "missing"),
-            ("malformed_stamp", True, 5.0, -3.0, "malformed"),
-            ("stale_stamp", True, 5.0, -3.0, "stale"),
-            ("future_stamp", True, 5.0, -3.0, "future"),
-            ("nan_lateral", True, float("nan"), -3.0, "fresh"),
-            ("infinite_vertical", True, 5.0, float("inf"), "fresh"),
-            ("excessive_lateral", True, 50.0, -3.0, "fresh"),
-            ("excessive_vertical", True, 5.0, -50.0, "fresh"),
+            ('invalid_target', False, 5.0, -3.0, 'fresh'),
+            ('missing_stamp', True, 5.0, -3.0, 'missing'),
+            ('malformed_stamp', True, 5.0, -3.0, 'malformed'),
+            ('stale_stamp', True, 5.0, -3.0, 'stale'),
+            ('future_stamp', True, 5.0, -3.0, 'future'),
+            ('nan_lateral', True, float('nan'), -3.0, 'fresh'),
+            ('infinite_vertical', True, 5.0, float('inf'), 'fresh'),
+            ('excessive_lateral', True, 50.0, -3.0, 'fresh'),
+            ('excessive_vertical', True, 5.0, -50.0, 'fresh'),
         ]
 
         for name, target_valid, lateral, vertical, stamp_kind in cases:
@@ -430,9 +430,9 @@ class TestApprovedOutput(unittest.TestCase):
                 )
                 self.messages.clear()
 
-                good_frame = "valid_" + name
-                bad_frame = "invalid_" + name
-                mode = {"bad": False, "sent": 0}
+                good_frame = 'valid_' + name
+                bad_frame = 'invalid_' + name
+                mode = {'bad': False, 'sent': 0}
 
                 def publish_candidate():
                     candidate = CandidateCommand()
@@ -444,23 +444,23 @@ class TestApprovedOutput(unittest.TestCase):
                     candidate.lateral = 5.0
                     candidate.vertical = -3.0
 
-                    if mode["bad"]:
+                    if mode['bad']:
                         candidate.header.frame_id = bad_frame
                         candidate.target_valid = target_valid
                         candidate.lateral = lateral
                         candidate.vertical = vertical
 
-                        if stamp_kind == "missing":
+                        if stamp_kind == 'missing':
                             candidate.header.stamp.sec = 0
                             candidate.header.stamp.nanosec = 0
-                        elif stamp_kind == "malformed":
+                        elif stamp_kind == 'malformed':
                             candidate.header.stamp.nanosec = 1_000_000_000
-                        elif stamp_kind == "stale":
+                        elif stamp_kind == 'stale':
                             candidate.header.stamp.sec -= 1
-                        elif stamp_kind == "future":
+                        elif stamp_kind == 'future':
                             candidate.header.stamp.sec += 1
 
-                        mode["sent"] += 1
+                        mode['sent'] += 1
 
                     self.publisher.publish(candidate)
 
@@ -481,10 +481,10 @@ class TestApprovedOutput(unittest.TestCase):
                             ),
                             timeout=2.0,
                         ),
-                        "Valid input did not establish tracking",
+                        'Valid input did not establish tracking',
                     )
 
-                    mode["bad"] = True
+                    mode['bad'] = True
                     cutoff_ns = self.node.get_clock().now().nanoseconds
                     self.messages.clear()
 
@@ -511,7 +511,7 @@ class TestApprovedOutput(unittest.TestCase):
                             lambda: bool(neutral_outputs()),
                             timeout=1.0,
                         ),
-                        "Invalid input did not block motion",
+                        'Invalid input did not block motion',
                     )
 
                     neutral_stamp = self.stamp_ns(
@@ -530,7 +530,7 @@ class TestApprovedOutput(unittest.TestCase):
                     def rejection_continues():
                         outputs = outputs_after_neutral()
                         return (
-                            mode["sent"] >= 5
+                            mode['sent'] >= 5
                             and len(outputs) >= 2
                             and outputs[-1][0] - outputs[0][0] >= 0.3
                         )
@@ -539,7 +539,7 @@ class TestApprovedOutput(unittest.TestCase):
                         self.wait_until(
                             rejection_continues, timeout=2.0
                         ),
-                        "Invalid stream or neutral output did not continue",
+                        'Invalid stream or neutral output did not continue',
                     )
 
                     # Never approve an observation from the invalid stream.
@@ -566,6 +566,7 @@ class TestApprovedOutput(unittest.TestCase):
                     self.call_service(
                         self.takeover_client, Trigger.Request()
                     )
+
 
 @launch_testing.post_shutdown_test()
 class TestProcessExit(unittest.TestCase):

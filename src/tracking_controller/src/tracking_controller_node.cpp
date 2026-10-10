@@ -11,70 +11,66 @@
 class TrackingControllerNode : public rclcpp::Node
 {
 public:
-    TrackingControllerNode()
-        : Node("tracking_controller")
-    {
-        publisher_ =
-        create_publisher<drone_interfaces::msg::CandidateCommand>(
+  TrackingControllerNode()
+  : Node("tracking_controller")
+  {
+    publisher_ =
+      create_publisher<drone_interfaces::msg::CandidateCommand>(
             "candidate_command",
             rclcpp::QoS(1));
-        subscription_ =
-            create_subscription<drone_interfaces::msg::HandTarget>(
+    subscription_ =
+      create_subscription<drone_interfaces::msg::HandTarget>(
                 "hand_target",
                 10,
-                [this](const drone_interfaces::msg::HandTarget & target)
-                {
-                    handle_target(target);
+      [this](const drone_interfaces::msg::HandTarget & target)
+      {
+        handle_target(target);
                 });
 
-        watchdog_timer_ = create_wall_timer(
+    watchdog_timer_ = create_wall_timer(
             std::chrono::milliseconds(20),
-            [this]()
-            {
-                check_target_timeout();
+      [this]()
+      {
+        check_target_timeout();
             });
-        RCLCPP_INFO(get_logger(), "Waiting for hand targets");
-    }
+    RCLCPP_INFO(get_logger(), "Waiting for hand targets");
+  }
 
 private:
+  drone_interfaces::msg::CandidateCommand last_candidate_;
 
+  std::chrono::steady_clock::time_point last_received_at_{};
 
-drone_interfaces::msg::CandidateCommand last_candidate_;
-
-std::chrono::steady_clock::time_point last_received_at_{};
-
-rclcpp::TimerBase::SharedPtr watchdog_timer_;
-rclcpp::Publisher<
+  rclcpp::TimerBase::SharedPtr watchdog_timer_;
+  rclcpp::Publisher<
     drone_interfaces::msg::CandidateCommand>::SharedPtr publisher_;
 
 
-void check_target_timeout()
-{
-    if (!last_candidate_.target_valid)
-    {
-        return;
+  void check_target_timeout()
+  {
+    if (!last_candidate_.target_valid) {
+      return;
     }
 
     const rclcpp::Time observation_time(
-        last_candidate_.header.stamp,
-        get_clock()->get_clock_type());
+      last_candidate_.header.stamp,
+      get_clock()->get_clock_type());
 
     const double source_age_seconds =
-        (now() - observation_time).seconds();
+      (now() - observation_time).seconds();
 
     const double receipt_age_seconds =
-        std::chrono::duration<double>(
+      std::chrono::duration<double>(
             std::chrono::steady_clock::now() - last_received_at_)
-        .count();
+      .count();
 
     const bool expired =
-        tracking_controller::target_expired(
+      tracking_controller::target_expired(
         source_age_seconds,
         receipt_age_seconds);
 
-    if (!expired)
-    {
-        return;
+    if (!expired) {
+      return;
     }
 
     last_candidate_.target_valid = false;
@@ -86,46 +82,44 @@ void check_target_timeout()
     RCLCPP_WARN(
         get_logger(),
         "Target expired: published neutral candidate command");
-}
-    void handle_target(
+  }
+  void handle_target(
     const drone_interfaces::msg::HandTarget & target)
-{
-    
+  {
+
 
     const auto & stamp = target.header.stamp;
 
     const bool stamp_valid =
-        tracking_controller::is_valid_stamp(
+      tracking_controller::is_valid_stamp(
             stamp.sec,
             stamp.nanosec);
     bool target_fresh = false;
 
-    if (stamp_valid)
-    {
-        const rclcpp::Time observation_time(
-            stamp,
-            get_clock()->get_clock_type());
+    if (stamp_valid) {
+      const rclcpp::Time observation_time(
+        stamp,
+        get_clock()->get_clock_type());
 
-        const double age_seconds =
-            (now() - observation_time).seconds();
+      const double age_seconds =
+        (now() - observation_time).seconds();
 
-        target_fresh =
-            tracking_controller::is_fresh_age(age_seconds);
+      target_fresh =
+        tracking_controller::is_fresh_age(age_seconds);
     }
     const bool target_valid =
-        target_fresh &&
-        target.detected &&
-        target.tracked_hands == 1 &&
-        std::isfinite(target.error_x) &&
-        std::isfinite(target.error_y) &&
-        std::abs(target.error_x) <= 1.0 &&
-        std::abs(target.error_y) <= 1.0;
+      target_fresh &&
+      target.detected &&
+      target.tracked_hands == 1 &&
+      std::isfinite(target.error_x) &&
+      std::isfinite(target.error_y) &&
+      std::abs(target.error_x) <= 1.0 &&
+      std::abs(target.error_y) <= 1.0;
 
     tracking_controller::MotionCommand command{0.0, 0.0};
 
-    if (target_valid)
-    {
-        command = tracking_controller::calculate_command(
+    if (target_valid) {
+      command = tracking_controller::calculate_command(
             target.error_x,
             target.error_y);
     }
@@ -148,19 +142,18 @@ void check_target_timeout()
         target_valid ? "true" : "false",
         command.lateral,
         command.vertical);
-}
-    rclcpp::Subscription<
-        drone_interfaces::msg::HandTarget>::SharedPtr subscription_;
+  }
+  rclcpp::Subscription<
+    drone_interfaces::msg::HandTarget>::SharedPtr subscription_;
 };
 
 int main(int argc, char * argv[])
 {
-    rclcpp::init(argc, argv);
+  rclcpp::init(argc, argv);
 
-    auto node = std::make_shared<TrackingControllerNode>();
-    rclcpp::spin(node);
+  auto node = std::make_shared<TrackingControllerNode>();
+  rclcpp::spin(node);
 
-    rclcpp::shutdown();
-    return 0;
+  rclcpp::shutdown();
+  return 0;
 }
-

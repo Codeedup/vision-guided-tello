@@ -38,16 +38,15 @@ TEST(CandidateSafety, ControllerRejectionBlocksCandidate)
 TEST(CandidateSafety, InvalidSourceAgesAreRejected)
 {
     const double invalid_ages[] = {
-        -0.01,
-        0.25,
-        1.0,
-        std::numeric_limits<double>::quiet_NaN(),
-        std::numeric_limits<double>::infinity()
+    -0.01,
+    0.25,
+    1.0,
+    std::numeric_limits<double>::quiet_NaN(),
+    std::numeric_limits<double>::infinity()
     };
 
-    for (double age : invalid_ages)
-    {
-        EXPECT_FALSE(mission_manager::candidate_values_are_usable(
+    for (double age : invalid_ages) {
+    EXPECT_FALSE(mission_manager::candidate_values_are_usable(
             true, 5.0, 5.0, age));
     }
 }
@@ -55,17 +54,16 @@ TEST(CandidateSafety, InvalidSourceAgesAreRejected)
 TEST(CandidateSafety, NonFiniteCommandsAreRejected)
 {
     const double invalid_values[] = {
-        std::numeric_limits<double>::quiet_NaN(),
-        std::numeric_limits<double>::infinity(),
-        -std::numeric_limits<double>::infinity()
+    std::numeric_limits<double>::quiet_NaN(),
+    std::numeric_limits<double>::infinity(),
+    -std::numeric_limits<double>::infinity()
     };
 
-    for (double value : invalid_values)
-    {
-        EXPECT_FALSE(mission_manager::candidate_values_are_usable(
+    for (double value : invalid_values) {
+    EXPECT_FALSE(mission_manager::candidate_values_are_usable(
             true, value, 0.0, 0.01));
 
-        EXPECT_FALSE(mission_manager::candidate_values_are_usable(
+    EXPECT_FALSE(mission_manager::candidate_values_are_usable(
             true, 0.0, value, 0.01));
     }
 }
@@ -73,18 +71,17 @@ TEST(CandidateSafety, NonFiniteCommandsAreRejected)
 TEST(CandidateSafety, CommandsBeyondEitherLimitAreRejected)
 {
     const double invalid_values[] = {
-        10.0001,
-        -10.0001,
-        11.0,
-        -11.0
+    10.0001,
+    -10.0001,
+    11.0,
+    -11.0
     };
 
-    for (double value : invalid_values)
-    {
-        EXPECT_FALSE(mission_manager::candidate_values_are_usable(
+    for (double value : invalid_values) {
+    EXPECT_FALSE(mission_manager::candidate_values_are_usable(
             true, value, 0.0, 0.01));
 
-        EXPECT_FALSE(mission_manager::candidate_values_are_usable(
+    EXPECT_FALSE(mission_manager::candidate_values_are_usable(
             true, 0.0, value, 0.01));
     }
 }

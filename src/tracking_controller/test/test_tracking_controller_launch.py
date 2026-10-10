@@ -1,22 +1,21 @@
 import time
 import unittest
 
+from drone_interfaces.msg import CandidateCommand, HandTarget
 import launch
 import launch_ros.actions
 import launch_testing.actions
 import launch_testing.asserts
 import rclpy
 
-from drone_interfaces.msg import CandidateCommand, HandTarget
-
 
 def generate_test_description():
     controller = launch_ros.actions.Node(
-        package="tracking_controller",
-        executable="tracking_controller_node",
-        namespace="watchdog_test",
-        parameters=[{"use_sim_time": False}],
-        output="screen",
+        package='tracking_controller',
+        executable='tracking_controller_node',
+        namespace='watchdog_test',
+        parameters=[{'use_sim_time': False}],
+        output='screen',
     )
 
     return (
@@ -24,7 +23,7 @@ def generate_test_description():
             controller,
             launch_testing.actions.ReadyToTest(),
         ]),
-        {"controller": controller},
+        {'controller': controller},
     )
 
 
@@ -39,22 +38,22 @@ class TestTargetWatchdog(unittest.TestCase):
 
     def setUp(self):
         self.node = rclpy.create_node(
-            "watchdog_probe",
-            namespace="watchdog_test",
+            'watchdog_probe',
+            namespace='watchdog_test',
         )
 
         self.messages = []
 
         self.subscription = self.node.create_subscription(
             CandidateCommand,
-            "candidate_command",
+            'candidate_command',
             self.messages.append,
             10,
         )
 
         self.publisher = self.node.create_publisher(
             HandTarget,
-            "hand_target",
+            'hand_target',
             1,
         )
 
@@ -86,11 +85,11 @@ class TestTargetWatchdog(unittest.TestCase):
             timeout_seconds=5.0,
         )
 
-        self.assertTrue(connected, "ROS endpoints did not connect")
+        self.assertTrue(connected, 'ROS endpoints did not connect')
 
         target = HandTarget()
         target.header.stamp = self.node.get_clock().now().to_msg()
-        target.header.frame_id = "test_camera"
+        target.header.frame_id = 'test_camera'
         target.detected = True
         target.error_x = 0.5
         target.error_y = -0.3
@@ -116,7 +115,7 @@ class TestTargetWatchdog(unittest.TestCase):
 
         self.assertTrue(
             valid_received,
-            "No valid command received for the fresh target",
+            'No valid command received for the fresh target',
         )
 
         valid_command = next(
@@ -138,7 +137,7 @@ class TestTargetWatchdog(unittest.TestCase):
 
         self.assertTrue(
             neutral_received,
-            "Watchdog did not publish an invalid command after silence",
+            'Watchdog did not publish an invalid command after silence',
         )
 
         neutral_command = next(

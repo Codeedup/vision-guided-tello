@@ -168,7 +168,7 @@ TEST(TargetSafety, AgesBelowTimeoutAreFresh)
     EXPECT_TRUE(tracking_controller::is_fresh_age(0.1));
 
     const double just_before_timeout =
-        std::nextafter(0.25, 0.0);
+    std::nextafter(0.25, 0.0);
 
     EXPECT_TRUE(
         tracking_controller::is_fresh_age(just_before_timeout));
@@ -188,10 +188,10 @@ TEST(TargetSafety, FutureObservationIsRejected)
 TEST(TargetSafety, NonFiniteAgesAreRejected)
 {
     const double nan =
-        std::numeric_limits<double>::quiet_NaN();
+    std::numeric_limits<double>::quiet_NaN();
 
     const double infinity =
-        std::numeric_limits<double>::infinity();
+    std::numeric_limits<double>::infinity();
 
     EXPECT_FALSE(tracking_controller::is_fresh_age(nan));
     EXPECT_FALSE(tracking_controller::is_fresh_age(infinity));
@@ -228,10 +228,10 @@ TEST(TargetSafety, NegativeClockAgesCauseExpiry)
 TEST(TargetSafety, NonFiniteClockAgesCauseExpiry)
 {
     const double nan =
-        std::numeric_limits<double>::quiet_NaN();
+    std::numeric_limits<double>::quiet_NaN();
 
     const double infinity =
-        std::numeric_limits<double>::infinity();
+    std::numeric_limits<double>::infinity();
 
     EXPECT_TRUE(
         tracking_controller::target_expired(nan, 0.1));

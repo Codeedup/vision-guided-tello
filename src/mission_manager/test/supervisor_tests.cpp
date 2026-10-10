@@ -75,20 +75,19 @@ TEST(Supervisor, ManualTakeoverRequiresExplicitReenable)
 
 namespace
 {
-    void send_fresh_targets(
-        mission_manager::Supervisor & supervisor,
-        std::int64_t first_stamp_ns,
-        unsigned count)
-    {
-        for (unsigned i = 0; i < count; ++i)
-        {
-            const auto stamp =
-                first_stamp_ns +
-                static_cast<std::int64_t>(i) * 100000000;
+void send_fresh_targets(
+  mission_manager::Supervisor & supervisor,
+  std::int64_t first_stamp_ns,
+  unsigned count)
+{
+  for (unsigned i = 0; i < count; ++i) {
+    const auto stamp =
+      first_stamp_ns +
+      static_cast<std::int64_t>(i) * 100000000;
 
-            supervisor.observe_target(stamp, true, 0.01);
-        }
-    }
+    supervisor.observe_target(stamp, true, 0.01);
+  }
+}
 }
 
 TEST(Supervisor, FiveFreshObservationsAreRequiredForTracking)
@@ -119,9 +118,8 @@ TEST(Supervisor, DuplicateAndOlderObservationsDoNotAdvanceAcquisition)
 
     send_fresh_targets(supervisor, 1000000000, 4);
 
-    for (unsigned i = 0; i < 10; ++i)
-    {
-        supervisor.observe_target(1300000000, true, 0.01);
+    for (unsigned i = 0; i < 10; ++i) {
+    supervisor.observe_target(1300000000, true, 0.01);
     }
 
     supervisor.observe_target(1200000000, true, 0.01);
@@ -154,27 +152,26 @@ TEST(Supervisor, InvalidObservationResetsAcquisition)
 TEST(Supervisor, UnusableAgesResetAcquisition)
 {
     const double rejected_ages[] = {
-        -0.01,
-        0.25,
-        std::numeric_limits<double>::quiet_NaN(),
-        std::numeric_limits<double>::infinity()
+    -0.01,
+    0.25,
+    std::numeric_limits<double>::quiet_NaN(),
+    std::numeric_limits<double>::infinity()
     };
 
-    for (double age : rejected_ages)
-    {
-        mission_manager::Supervisor supervisor;
-        supervisor.enable_autonomy();
+    for (double age : rejected_ages) {
+    mission_manager::Supervisor supervisor;
+    supervisor.enable_autonomy();
 
-        send_fresh_targets(supervisor, 1000000000, 4);
+    send_fresh_targets(supervisor, 1000000000, 4);
 
-        supervisor.observe_target(1400000000, true, age);
+    supervisor.observe_target(1400000000, true, age);
 
-        send_fresh_targets(supervisor, 1500000000, 4);
+    send_fresh_targets(supervisor, 1500000000, 4);
 
-        EXPECT_EQ(
+    EXPECT_EQ(
             supervisor.decision().state,
             mission_manager::AutonomyState::ACQUIRE);
-        EXPECT_FALSE(supervisor.decision().allow_tracking);
+    EXPECT_FALSE(supervisor.decision().allow_tracking);
     }
 }
 
@@ -319,27 +316,25 @@ TEST(Supervisor, ReceiptExpiryBlocksTrackingDespiteFrozenSourceClock)
 TEST(Supervisor, InvalidClockAgesBlockTracking)
 {
     const double invalid_ages[] = {
-        -0.01,
-        std::numeric_limits<double>::quiet_NaN(),
-        std::numeric_limits<double>::infinity()
+    -0.01,
+    std::numeric_limits<double>::quiet_NaN(),
+    std::numeric_limits<double>::infinity()
     };
 
-    for (double invalid_age : invalid_ages)
-    {
-        for (bool invalid_source : {true, false})
-        {
-            mission_manager::Supervisor supervisor;
-            supervisor.enable_autonomy();
-            send_fresh_targets(supervisor, 1000000000, 5);
+    for (double invalid_age : invalid_ages) {
+    for (bool invalid_source : {true, false}) {
+      mission_manager::Supervisor supervisor;
+      supervisor.enable_autonomy();
+      send_fresh_targets(supervisor, 1000000000, 5);
 
-            supervisor.update_time(
+      supervisor.update_time(
                 invalid_source ? invalid_age : 0.01,
                 invalid_source ? 0.01 : invalid_age);
 
-            EXPECT_EQ(supervisor.decision().state,
+      EXPECT_EQ(supervisor.decision().state,
                       mission_manager::AutonomyState::LOST_HOVER);
-            EXPECT_FALSE(supervisor.decision().allow_tracking);
-        }
+      EXPECT_FALSE(supervisor.decision().allow_tracking);
+    }
     }
 }
 
@@ -366,16 +361,16 @@ TEST(Supervisor, TimeoutClearsPartialAcquisition)
 }
 namespace
 {
-void start_timed_loss(mission_manager::Supervisor &supervisor)
+void start_timed_loss(mission_manager::Supervisor & supervisor)
 {
-    supervisor.enable_autonomy();
-    send_fresh_targets(supervisor, 1000000000, 5);
+  supervisor.enable_autonomy();
+  send_fresh_targets(supervisor, 1000000000, 5);
 
-    supervisor.update_loss_timer(10.0);
+  supervisor.update_loss_timer(10.0);
 
     // Freshness expires independently of incoming messages.
-    supervisor.update_time(0.25, 0.25);
-    supervisor.update_loss_timer(10.0);
+  supervisor.update_time(0.25, 0.25);
+  supervisor.update_loss_timer(10.0);
 }
 }
 
@@ -490,20 +485,19 @@ TEST(Supervisor, LandingRemainsLatchedUntilManualTakeover)
 TEST(Supervisor, InvalidOrBackwardTimerTimeRequestsLanding)
 {
     const double invalid_times[] = {
-        -0.01,
-        9.0,  // Earlier than the previously supplied time of 10.0.
-        std::numeric_limits<double>::quiet_NaN(),
-        std::numeric_limits<double>::infinity()
+    -0.01,
+    9.0,      // Earlier than the previously supplied time of 10.0.
+    std::numeric_limits<double>::quiet_NaN(),
+    std::numeric_limits<double>::infinity()
     };
 
-    for (double invalid_time : invalid_times)
-    {
-        mission_manager::Supervisor supervisor;
-        start_timed_loss(supervisor);
+    for (double invalid_time : invalid_times) {
+    mission_manager::Supervisor supervisor;
+    start_timed_loss(supervisor);
 
-        supervisor.update_loss_timer(invalid_time);
+    supervisor.update_loss_timer(invalid_time);
 
-        EXPECT_TRUE(supervisor.decision().request_land);
-        EXPECT_FALSE(supervisor.decision().allow_tracking);
+    EXPECT_TRUE(supervisor.decision().request_land);
+    EXPECT_FALSE(supervisor.decision().allow_tracking);
     }
 }

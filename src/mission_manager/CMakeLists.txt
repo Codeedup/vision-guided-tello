@@ -44,7 +44,6 @@ if(BUILD_TESTING)
 
   find_package(ament_cmake_ros REQUIRED)
   find_package(launch_testing_ament_cmake REQUIRED)
-  
   # the following line skips the linter which checks for copyrights
   # comment the line when a copyright and license is added to all source files
   set(ament_cmake_copyright_FOUND TRUE)
@@ -54,8 +53,7 @@ if(BUILD_TESTING)
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 
-    ament_add_gtest(
-    candidate_safety_tests
+  ament_add_gtest(candidate_safety_tests
     test/candidate_safety_tests.cpp
   )
 
