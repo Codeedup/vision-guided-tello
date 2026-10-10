@@ -76,12 +76,12 @@ class TimingTrace:
     def finish(self, completion='shutdown'):
         if self.file.closed:
             return
-        report = dict(trace_version=1, metadata=self.metadata,
-                      started_ns=self.started_ns, ended_ns=time.monotonic_ns(),
-                      completion=completion, capacity=self.events.maxlen,
-                      events_retained=len(self.events), events_omitted=self.omitted,
-                      first_fault=self.first_fault, first_expiry=self.first_expiry,
-                      events=list(self.events))
+        report = {'trace_version': 1, 'metadata': self.metadata,
+                  'started_ns': self.started_ns, 'ended_ns': time.monotonic_ns(),
+                  'completion': completion, 'capacity': self.events.maxlen,
+                  'events_retained': len(self.events), 'events_omitted': self.omitted,
+                  'first_fault': self.first_fault, 'first_expiry': self.first_expiry,
+                  'events': list(self.events)}
         try:
             json.dump(report, self.file, allow_nan=False)
             self.file.write('\n')

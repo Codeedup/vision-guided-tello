@@ -43,7 +43,9 @@ Each demo requires a new output directory and writes synthetic reports/logs.
 It explicitly enables the software mock and fake bridge for a bounded session;
 ordinary launches require a separate operator enable.
 
-For the next user step, follow [laptop baseline and staged acceptance](docs/user_acceptance_tests.md).
+The current laptop gate is the operator lease timing failure. Follow the
+[paired FAKE timing diagnostic recipe](docs/lease_timing_debug.md) before repeating
+acceptance. The [staged acceptance matrix](docs/user_acceptance_tests.md) follows.
 See [Windows/WSL setup](docs/windows_wsl_setup.md), [authority and interfaces](docs/architecture.md),
 [offline validation](docs/offline_validation.md), [current checkpoint](docs/current_checkpoint.md)
 and [dependency/model provenance](docs/provenance.md).

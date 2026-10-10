@@ -10,7 +10,7 @@ import rclpy
 from rclpy.signals import SignalHandlerOptions
 from std_srvs.srv import SetBool, Trigger
 from tello_bridge.cadence import run_heartbeats
-from tello_bridge.timing import TimingTrace, source_hash
+from tello_bridge.timing import source_hash, TimingTrace
 
 
 class ServiceRejected(RuntimeError):

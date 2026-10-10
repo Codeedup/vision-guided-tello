@@ -1,5 +1,11 @@
 # Offline preparation checkpoint — 10 October 2026
 
+Current live debugging checkpoint: the latest user handoff records eligible webcam
+input and supervisor TRACK, but independent bridge operator-lease expiry. The
+[FAKE lease timing diagnostic](lease_timing_debug.md) now provides paired server/client
+traces and an explicitly paced operator. Its GitHub regression evidence does not
+replace repeated WSL webcam trials. The offline preparation record below is historical.
+
 Branch: `codex/offline-preparation-2026-10-10`, based on clean `1a16868`.
 Validated implementation: `75de0905974349535266a3037e8982ecb721148a`.
 The follow-up commit adds evidence/documentation only; `git rev-parse HEAD`

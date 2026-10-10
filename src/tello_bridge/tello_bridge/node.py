@@ -17,7 +17,7 @@ from std_msgs.msg import String
 from std_srvs.srv import Trigger
 from tello_bridge.arbiter import Arbiter
 from tello_bridge.policy import Command, Telemetry
-from tello_bridge.timing import TimingTrace, source_hash
+from tello_bridge.timing import source_hash, TimingTrace
 from tello_bridge.transport import FakeTransport, OwnerLock
 
 

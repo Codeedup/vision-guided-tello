@@ -5,7 +5,8 @@ import time
 
 def run_heartbeats(heartbeat, spin_once, duration=None, *, legacy=False,
                    clock=time.monotonic):
-    """Service executor work while waiting for an explicit 80 ms send interval.
+    """
+    Service executor work while waiting for an explicit 80 ms send interval.
 
     Each deadline starts at the actual send attempt. Late execution skips missed
     slots; only one request can be in flight. Exceptions/SIGINT propagate to the
