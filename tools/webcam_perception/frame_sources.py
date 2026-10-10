@@ -135,7 +135,13 @@ class RecordedFrames:
 def decode_av(uri):
     """Yield genuine decoder events, never a library's cached .frame property."""
     import av
-    with av.open(uri, timeout=(2.0, 0.2)) as stream:
+    open_options = {}
+    if uri.startswith('udp://'):
+        # Tello sends raw H.264. Avoid format autodetection and a large live
+        # stream probe before the first decode; file fixtures retain autodetection.
+        open_options = {'format': 'h264', 'options': {
+            'probesize': '32768', 'analyzeduration': '1000000'}}
+    with av.open(uri, timeout=(2.0, 0.2), **open_options) as stream:
         for sequence, image in enumerate(stream.decode(video=0)):
             receipt_ns, mono_ns = time.time_ns(), time.monotonic_ns()
             pixels = image.to_ndarray(format='bgr24')
