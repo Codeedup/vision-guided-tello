@@ -7,3 +7,8 @@
 __pycache__/
 *.pyc
 /.venv/
+
+# Downloaded models and local evidence
+/tools/webcam_perception/models/*.task
+/.pytest_cache/
+/artifacts/

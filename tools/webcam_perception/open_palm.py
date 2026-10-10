@@ -1,6 +1,5 @@
 import math
 
-
 # Provisional thresholds: validate on recorded and live examples.
 MIN_JOINT_ANGLE_DEG = 150.0
 MIN_THUMB_SPREAD_RATIO = 0.5

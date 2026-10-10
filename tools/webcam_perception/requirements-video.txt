@@ -1,0 +1,2 @@
+# Optional proposed decoder. Validated separately on Linux Python 3.12 with synthetic pixels.
+av==19.0.1

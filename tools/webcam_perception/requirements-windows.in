@@ -1,0 +1,5 @@
+# Candidate direct dependencies. Resolve into a NEW environment, never replace the working venv.
+# requirements-windows.txt is the historical user-reported environment snapshot.
+mediapipe==1.1.0
+opencv-contrib-python==5.0.0.93
+numpy==2.5.3

@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>tello_bridge</name>
+  <version>0.1.0</version>
+  <description>Offline-first approved-command boundary and pipeline evidence tools.</description>
+  <maintainer email="dylanmoffett@hotmail.com">dylan</maintainer>
+  <license>Apache-2.0</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>rcl_interfaces</exec_depend>
+  <exec_depend>drone_interfaces</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>std_srvs</exec_depend>
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>tracking_controller</exec_depend>
+  <exec_depend>mission_manager</exec_depend>
+  <exec_depend>mock_tello</exec_depend>
+  <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>ament_cmake_ros</test_depend>
+  <test_depend>ament_cmake_flake8</test_depend>
+  <test_depend>ament_cmake_pep257</test_depend>
+  <test_depend>ament_cmake_xmllint</test_depend>
+  <test_depend>ament_cmake_lint_cmake</test_depend>
+  <test_depend>launch_testing</test_depend>
+  <test_depend>launch_testing_ament_cmake</test_depend>
+  <export><build_type>ament_cmake</build_type></export>
+</package>

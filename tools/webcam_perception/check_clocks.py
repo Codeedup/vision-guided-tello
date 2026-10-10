@@ -1,7 +1,6 @@
 import subprocess
 import time
 
-
 probe_code = """
 import sys
 import time
@@ -13,22 +12,22 @@ for line in sys.stdin:
 """
 
 process = subprocess.Popen(
-    ["wsl.exe", "-d", "Ubuntu", "--", "python3", "-u", "-c", probe_code],
+    ['wsl.exe', '-d', 'Ubuntu', '--', 'python3', '-u', '-c', probe_code],
     stdin=subprocess.PIPE,
     stdout=subprocess.PIPE,
     text=True,
 )
 
 try:
-    if process.stdout.readline().strip() != "READY":
-        raise RuntimeError("WSL clock probe did not start.")
+    if process.stdout.readline().strip() != 'READY':
+        raise RuntimeError('WSL clock probe did not start.')
 
     samples = []
 
     for _ in range(10):
         windows_before = time.time_ns()
 
-        process.stdin.write("sample\n")
+        process.stdin.write('sample\n')
         process.stdin.flush()
 
         wsl_time = int(process.stdout.readline().strip())
@@ -42,8 +41,8 @@ try:
     _, lower_ms, upper_ms = min(samples)
 
     print(
-        "WSL clock minus Windows clock is between "
-        f"{lower_ms:+.3f} and {upper_ms:+.3f} ms"
+        'WSL clock minus Windows clock is between '
+        f'{lower_ms:+.3f} and {upper_ms:+.3f} ms'
     )
 
 finally:

@@ -1,0 +1,8 @@
+{
+  "version": "2.5.0",
+  "wheel": "djitellopy-2.5.0-py3-none-any.whl",
+  "sha256": "525e9072dfb53a1f43051b6a8cbe33737def8430e8bf7b838c44a4c485c961e8",
+  "source": "https://files.pythonhosted.org/packages/a7/06/8da29bca8ec949043b840e00cad95ba96d3ad31cbec20cad2d409c0c7e37/djitellopy-2.5.0-py3-none-any.whl",
+  "requires_python": ">=3.6",
+  "license_metadata": "MIT"
+}

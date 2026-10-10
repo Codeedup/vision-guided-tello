@@ -1,9 +1,8 @@
 import math
-import unittest
 from types import SimpleNamespace
+import unittest
 
 from open_palm import is_open_palm
-
 
 WIDTH = 640
 HEIGHT = 480
@@ -76,8 +75,8 @@ class TestOpenPalm(unittest.TestCase):
 
     def test_invalid_coordinates_are_rejected(self):
         for coordinate in (
-            (float("nan"), 0.5),
-            (0.5, float("inf")),
+            (float('nan'), 0.5),
+            (0.5, float('inf')),
             (-0.01, 0.5),
             (0.5, 1.01),
         ):
@@ -91,5 +90,5 @@ class TestOpenPalm(unittest.TestCase):
         self.assertFalse(eligible([(0.5, 0.5)] * 21))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

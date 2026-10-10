@@ -1,0 +1,35 @@
+{
+  "date": "2026-10-10",
+  "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+  "linux_python": "3.12.3",
+  "clean_linux_candidate_dependencies": [
+    "absl-py==2.5.1",
+    "certifi==2026.7.22",
+    "cffi==2.1.1",
+    "contourpy==1.4.0",
+    "cycler==0.12.1",
+    "flatbuffers==25.12.19",
+    "fonttools==4.66.1",
+    "kiwisolver==1.5.1",
+    "matplotlib==3.11.2",
+    "mediapipe==1.1.0",
+    "numpy==2.5.3",
+    "opencv-contrib-python==5.0.0.93",
+    "packaging==26.3",
+    "pillow==12.3.0",
+    "pycparser==3.11",
+    "pyparsing==3.3.3",
+    "python-dateutil==2.9.0.post0",
+    "six==1.17.0",
+    "sounddevice==0.5.6"
+  ],
+  "clean_linux_verified_model_load": "passed; no camera opened",
+  "windows_cp314_wheel_resolution": "passed; download/resolution only, no Windows execution",
+  "decoder": {
+    "version": "19.0.1",
+    "fixture": "generated 2x2 RGB bars encoded losslessly as FFV1 in Matroska",
+    "result": "three genuine decode events, exact RGB bytes, unmirrored dimensions, isolated worker passed"
+  },
+  "model_sha256": "fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1",
+  "hardware_checks_run": false
+}

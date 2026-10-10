@@ -1,0 +1,45 @@
+name: Offline ROS and policy checks
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  jazzy:
+    runs-on: ubuntu-24.04
+    container: ros:jazzy-ros-base
+    timeout-minutes: 20
+    env:
+      ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install build and declared test dependencies
+        shell: bash
+        run: |
+          apt-get update
+          apt-get install -y build-essential python3-colcon-common-extensions python3-rosdep python3-pytest python3-numpy python3-venv
+          rosdep update
+          rosdep install --from-paths src --ignore-src -r -y --rosdistro jazzy
+      - name: Build and exercise registered production/loopback tests
+        shell: bash
+        run: tools/run_offline_checks.sh
+      - name: Optional decoder with synthetic lossless fixtures
+        shell: bash
+        run: |
+          python3 -m venv --system-site-packages /tmp/tello-video-check
+          /tmp/tello-video-check/bin/pip install -r tools/webcam_perception/requirements-video.txt
+          /tmp/tello-video-check/bin/python tools/webcam_perception/check_decoder.py
+      - name: Pure policies without ROS environment
+        shell: bash
+        run: |
+          PYTHONPATH=src/tello_bridge:tools/webcam_perception:tools/tello_diagnostics python3 -m pytest -q src/tello_bridge/test/test_boundary.py tools/webcam_perception/test_measure_pipeline.py tools/webcam_perception/test_frame_sources.py tools/webcam_perception/test_open_palm.py tools/webcam_perception/test_model_asset.py tools/tello_diagnostics/test_diagnose.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: offline-test-results
+          path: |
+            build/*/test_results
+            log/latest_test

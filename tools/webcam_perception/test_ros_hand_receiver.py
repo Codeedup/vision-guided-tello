@@ -1,8 +1,8 @@
 import json
 import unittest
+from unittest.mock import Mock
 
 from ros_hand_receiver import decode_observation, WebcamReceiver
-from unittest.mock import Mock
 
 
 class TestObservationDecoder(unittest.TestCase):
@@ -10,15 +10,15 @@ class TestObservationDecoder(unittest.TestCase):
 
     def observation(self):
         return {
-            "capture_time_ns": self.NOW_NS,
-            "detected": True,
-            "error_x": 0.2,
-            "error_y": -0.1,
-            "tracked_hands": 1,
+            'capture_time_ns': self.NOW_NS,
+            'detected': True,
+            'error_x': 0.2,
+            'error_y': -0.1,
+            'tracked_hands': 1,
         }
 
     def decode(self, observation):
-        packet = json.dumps(observation).encode("utf-8")
+        packet = json.dumps(observation).encode('utf-8')
         return decode_observation(packet, self.NOW_NS)
 
     def test_freshness_boundary(self):
@@ -31,7 +31,7 @@ class TestObservationDecoder(unittest.TestCase):
         ]:
             with self.subTest(age_ns=age_ns):
                 observation = self.observation()
-                observation["capture_time_ns"] -= age_ns
+                observation['capture_time_ns'] -= age_ns
 
                 if accepted:
                     self.decode(observation)
@@ -41,15 +41,15 @@ class TestObservationDecoder(unittest.TestCase):
 
     def test_invalid_fields(self):
         cases = [
-            ("capture_time_ns", True),
-            ("detected", "true"),
-            ("tracked_hands", 2),
-            ("tracked_hands", -1),
-            ("error_x", "0.2"),
-            ("error_x", float("nan")),
-            ("error_y", float("inf")),
-            ("error_x", 1.01),
-            ("detected", False),
+            ('capture_time_ns', True),
+            ('detected', 'true'),
+            ('tracked_hands', 2),
+            ('tracked_hands', -1),
+            ('error_x', '0.2'),
+            ('error_x', float('nan')),
+            ('error_y', float('inf')),
+            ('error_x', 1.01),
+            ('detected', False),
         ]
 
         for field, value in cases:
@@ -62,15 +62,14 @@ class TestObservationDecoder(unittest.TestCase):
 
     def test_invalid_json(self):
         with self.assertRaises(ValueError):
-            decode_observation(b"not JSON", self.NOW_NS)
+            decode_observation(b'not JSON', self.NOW_NS)
 
     def test_missing_field(self):
         observation = self.observation()
-        del observation["capture_time_ns"]
+        del observation['capture_time_ns']
 
         with self.assertRaises(KeyError):
             self.decode(observation)
-
 
     def process_packets(self, observations, last_stamp=0, publish_age_ns=0):
         node = Mock()
@@ -84,7 +83,7 @@ class TestObservationDecoder(unittest.TestCase):
         node.last_published_stamp = last_stamp
 
         packets = [
-            (json.dumps(item).encode(), ("127.0.0.1", 5005))
+            (json.dumps(item).encode(), ('127.0.0.1', 5005))
             for item in observations
         ]
         node.receiver.recvfrom.side_effect = (
@@ -108,7 +107,7 @@ class TestObservationDecoder(unittest.TestCase):
 
     def test_rejected_packet_does_not_block_valid_packet(self):
         invalid = self.observation()
-        invalid["tracked_hands"] = 2
+        invalid['tracked_hands'] = 2
 
         node = self.process_packets([invalid, self.observation()])
         node.publisher.publish.assert_called_once()
@@ -116,7 +115,7 @@ class TestObservationDecoder(unittest.TestCase):
     def test_duplicate_and_older_packets_are_not_published(self):
         duplicate = self.observation()
         older = self.observation()
-        older["capture_time_ns"] -= 1_000_000
+        older['capture_time_ns'] -= 1_000_000
 
         node = self.process_packets(
             [duplicate, older],
@@ -130,12 +129,12 @@ class TestObservationDecoder(unittest.TestCase):
 
     def test_newest_packet_in_batch_is_selected(self):
         older = self.observation()
-        older["capture_time_ns"] -= 2_000_000
+        older['capture_time_ns'] -= 2_000_000
 
         newest = self.observation()
 
         middle = self.observation()
-        middle["capture_time_ns"] -= 1_000_000
+        middle['capture_time_ns'] -= 1_000_000
 
         node = self.process_packets([older, newest, middle])
         node.publisher.publish.assert_called_once()
@@ -145,7 +144,7 @@ class TestObservationDecoder(unittest.TestCase):
             message.header.stamp.sec * 1_000_000_000
             + message.header.stamp.nanosec
         )
-        self.assertEqual(stamp_ns, newest["capture_time_ns"])
+        self.assertEqual(stamp_ns, newest['capture_time_ns'])
 
     def test_freshness_is_rechecked_before_publication(self):
         for age_ns, accepted in [
@@ -164,5 +163,6 @@ class TestObservationDecoder(unittest.TestCase):
                     node.publisher.publish.assert_not_called()
                     self.assertEqual(node.last_published_stamp, 0)
 
-if __name__ == "__main__":
+
+if __name__ == '__main__':
     unittest.main()
