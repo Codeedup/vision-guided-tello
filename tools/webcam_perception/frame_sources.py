@@ -162,7 +162,7 @@ def decoder_worker(uri, output, stop, decoder):
     except Exception as error:
         # Parent observes timeout even if a decoder fails without delivering this event.
         try:
-            output.put_nowait(('decoder_error', type(error).__name__))
+            output.put_nowait(('decoder_error', type(error).__name__, str(error)))
         except queue.Full:
             pass
 

@@ -76,6 +76,11 @@ def run_diagnostic(transport, duration=2, video=False, decoder_factory=None, sta
                 last_frame_ns = mono_ns
             time.sleep(0.01)
     finally:
+        observation_ended_ns = time.monotonic_ns()
+        result['decoder_error'] = getattr(decoder, 'last_error', None)
+        process = getattr(decoder, 'process', None)
+        result['decoder_exitcode_at_observation_end'] = (
+            None if process is None else process.exitcode)
         try:
             if decoder:
                 decoder.close()
@@ -92,12 +97,17 @@ def run_diagnostic(transport, duration=2, video=False, decoder_factory=None, sta
                         state_source.close()
                 finally:
                     channel.close()
+    finished_ns = time.monotonic_ns()
+    result['cleanup_duration_ms'] = (finished_ns - observation_ended_ns) / 1e6
+    result['telemetry_age_ms_at_observation_end'] = (
+        None if result['telemetry'] is None else
+        (observation_ended_ns - result['telemetry']['receipt_ns']) / 1e6)
     result['maximum_frame_receipt_gap_ms'] = maximum_gap_ms
     result['terminal_frame_silence_ms'] = (None if last_frame_ns is None else
-                                           (time.monotonic_ns() - last_frame_ns) / 1e6)
+                                           (finished_ns - last_frame_ns) / 1e6)
     result['telemetry_age_ms_at_finish'] = (
         None if result['telemetry'] is None else
-        (time.monotonic_ns() - result['telemetry']['receipt_ns']) / 1e6)
+        (finished_ns - result['telemetry']['receipt_ns']) / 1e6)
     result['events'] = list(transport.events)
     result['events_omitted'] = transport.events_omitted
     return result
