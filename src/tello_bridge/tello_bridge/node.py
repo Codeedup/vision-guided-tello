@@ -173,7 +173,8 @@ class Bridge(Node):
     def destroy_node(self):
         try:
             if self.arbiter:
-                self.arbiter.shutdown(time.monotonic_ns())
+                with self.measure('shutdown'):
+                    self.arbiter.shutdown(time.monotonic_ns())
             if self.owner:
                 self.owner.close()
             return super().destroy_node()
@@ -185,6 +186,9 @@ class Bridge(Node):
 def main(args=None):
     rclpy.init(args=args, signal_handler_options=SignalHandlerOptions.NO)
     signal.signal(signal.SIGINT, signal.default_int_handler)
+    # Launch escalates to SIGTERM if SIGINT does not terminate the process.
+    # Route both signals through the same authority/transport/trace cleanup.
+    signal.signal(signal.SIGTERM, signal.default_int_handler)
     node = None
     try:
         node = Bridge()
@@ -193,6 +197,7 @@ def main(args=None):
         pass
     finally:
         signal.signal(signal.SIGINT, signal.SIG_IGN)
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
         if node:
             node.destroy_node()
         if rclpy.ok():

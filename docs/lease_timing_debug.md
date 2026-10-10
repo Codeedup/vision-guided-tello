@@ -30,7 +30,10 @@ disabled, unlatched FAKE bridge. Ordinary commands retain their existing behavio
 
 Reports reserve a new output file exclusively at startup and refuse overwrite.
 Events stay in memory and are written at orderly completion/shutdown. A running
-report is empty until then. SIGKILL, host failure or a write failure can leave an
+report is empty until then. The bridge handles both SIGINT and launch's SIGTERM
+escalation through authority revocation, neutral/landing cleanup and trace finish.
+The final `shutdown` event records the authority before and after cleanup.
+SIGKILL, host failure or a write failure can leave an
 empty/incomplete file. Do not treat it as a complete report. No per-event console
 or file writes or added executor-ready callbacks are used. Tracing still adds
 work and can affect timing; compare equivalent traced trials first.
@@ -43,6 +46,32 @@ callback exit-to-client observation includes response transport/client delay.
 The public Trigger service has no request ID: correlate sequential heartbeats
 using exactly one operator client, acceptance order and absolute monotonic times.
 Timed-out calls and extra clients make matching ambiguous; report that explicitly.
+
+## Live run 06 retry and shutdown correction
+
+The supplied client and monitor reports at `713618c` identify an input-loss trial:
+the last usable hand/candidate preceded upstream enable by approximately 3.1 s.
+During enable the monitor saw no hand and no tracking approval. Approved messages
+continued arriving (maximum observed gap 22.6 ms); the bridge reported
+`APPROVED_INPUT_LOSS` about 1.5 s after arm. This reason means loss of usable tracking,
+not necessarily loss of the approved topic. The client recorded 1,771 legacy
+heartbeat calls in approximately 1.5 s, 1,770 accepted before the input-loss rejection.
+No complete 10-second tracking interval was established. Takeover status showed
+disarmed, upstream disabled and zero RC output.
+
+The server file was empty after exit. The supplied launch log records no exit within
+5 s of SIGINT, followed by SIGTERM and bridge exit code -15. The original adapter
+handled SIGINT only; SIGTERM bypassed trace cleanup. The reason all four launched
+processes failed to exit on SIGINT is not established by that log. Signal regression
+tests now start the actual bridge adapter in a new process/session, establish
+armed FAKE tracking and send SIGINT or SIGTERM. Both must exit zero, flush valid
+bounded traces, revoke authority and record final neutral/landing operations.
+
+Before another webcam trial, verify trace shutdown locally with a new filename.
+For the next tracked trial, keep one eligible open hand visible while starting
+enable with the other hand; do not stop the preview until the monitor finishes.
+Use the paced operator (omit `--legacy-heartbeat-cadence`) and preserve all three
+reports. This run does not establish a lighting cause or explain run 05's lease expiry.
 Windows monotonic time has a different origin; pipeline source-age analysis still
 uses the existing source/ROS timestamps and clock-check procedure.
 
