@@ -1,4 +1,5 @@
 """PyAV boundary checks with synthetic decoder events; no aircraft access."""
+from contextlib import nullcontext
 from queue import Queue
 import socket
 from threading import Event
@@ -8,6 +9,19 @@ from unittest.mock import Mock, patch
 
 from frame_sources import decode_av, decoder_worker, DecoderSource, Frame
 import pytest
+
+
+class SyntheticInvalidDataError(Exception):
+    pass
+
+
+def synthetic_av(codec):
+    return SimpleNamespace(
+        CodecContext=SimpleNamespace(create=Mock(return_value=codec)),
+        open=Mock(side_effect=AssertionError('UDP must not call av.open')),
+        InvalidDataError=SyntheticInvalidDataError,
+        logging=SimpleNamespace(ERROR=16, set_level=Mock(),
+                                Capture=lambda **kwargs: nullcontext([])))
 
 
 def test_udp_fragments_share_parser_and_only_decoded_images_create_frames():
@@ -30,8 +44,7 @@ def test_udp_fragments_share_parser_and_only_decoded_images_create_frames():
             return [image]
 
     codec = SyntheticCodec()
-    av = SimpleNamespace(CodecContext=SimpleNamespace(create=Mock(return_value=codec)),
-                         open=Mock(side_effect=AssertionError('UDP must not call av.open')))
+    av = synthetic_av(codec)
     stages = []
 
     def status(stage):
@@ -60,12 +73,81 @@ def test_udp_silence_reports_timeout_and_closes_socket():
     receiver.__enter__ = Mock(return_value=receiver)
     receiver.__exit__ = Mock(return_value=False)
     receiver.recvfrom.side_effect = socket.timeout('Synthetic silence')
-    av = SimpleNamespace(CodecContext=SimpleNamespace(create=Mock()))
+    av = synthetic_av(Mock())
     with patch.dict('sys.modules', {'av': av}), \
             patch('frame_sources.socket.socket', return_value=receiver), \
             pytest.raises(TimeoutError, match='packet receipt timed out'):
         next(decode_av('udp://127.0.0.1:11111'))
     receiver.settimeout.assert_called_once_with(2.0)
+    receiver.__exit__.assert_called_once()
+
+
+def test_invalid_h264_packet_recovers_without_creating_a_frame_for_the_error():
+    image = SimpleNamespace(width=1, height=1, pts=None,
+                            to_ndarray=lambda **kwargs: SimpleNamespace(tobytes=lambda: b'RGB'))
+    codec = SimpleNamespace(
+        parse=Mock(side_effect=[[b'\0\0\1\x67bad'], [b'good']]),
+        decode=Mock(side_effect=[SyntheticInvalidDataError('no frame'), [image]]))
+    av = synthetic_av(codec)
+    av.logging.Capture = lambda **kwargs: nullcontext([(16, 'h264', 'synthetic no frame')])
+    receiver = Mock()
+    receiver.__enter__ = Mock(return_value=receiver)
+    receiver.__exit__ = Mock(return_value=False)
+    receiver.recvfrom.side_effect = [(b'first', ('127.0.0.1', 1)),
+                                     (b'second', ('127.0.0.1', 1))]
+    progress = []
+
+    def status(stage, **details):
+        progress.append({'stage': stage, **details})
+
+    frames = decode_av('udp://127.0.0.1:11111', report_status=status)
+    try:
+        with patch.dict('sys.modules', {'av': av}), \
+                patch('frame_sources.socket.socket', return_value=receiver):
+            frame = next(frames)
+        assert frame.sequence == 0 and frame.pixels == b'RGB'
+        invalid = next(e for e in progress if e['stage'] == 'invalid_h264_packet')
+        assert invalid['nal_unit_types'] == [7]
+        assert invalid['packet_bytes'] == 7
+        assert 'synthetic no frame' in invalid['ffmpeg_logs'][0]
+        recovered = next(e for e in progress if e['stage'] == 'h264_recovered')
+        assert recovered['invalid_packets'] == 1
+        assert codec.decode.call_count == 2
+    finally:
+        frames.close()
+    receiver.__exit__.assert_called_once()
+
+
+def test_continuous_invalid_packets_have_a_bounded_recovery_window():
+    codec = SimpleNamespace(parse=Mock(return_value=[b'bad']),
+                            decode=Mock(side_effect=SyntheticInvalidDataError('no frame')))
+    av = synthetic_av(codec)
+    receiver = Mock()
+    receiver.__enter__ = Mock(return_value=receiver)
+    receiver.__exit__ = Mock(return_value=False)
+    receiver.recvfrom.return_value = (b'bytes', ('127.0.0.1', 1))
+    with patch.dict('sys.modules', {'av': av}), \
+            patch('frame_sources.socket.socket', return_value=receiver), \
+            patch('frame_sources.time.monotonic', side_effect=[0, 0.5, 2.01]), \
+            pytest.raises(RuntimeError, match='No decodable H.264 frame for 2 seconds'):
+        next(decode_av('udp://127.0.0.1:11111'))
+    assert codec.decode.call_count == 2
+    receiver.__exit__.assert_called_once()
+
+
+def test_other_decode_errors_remain_terminal():
+    codec = SimpleNamespace(parse=Mock(return_value=[b'bad']),
+                            decode=Mock(side_effect=MemoryError('Synthetic allocation failure')))
+    av = synthetic_av(codec)
+    receiver = Mock()
+    receiver.__enter__ = Mock(return_value=receiver)
+    receiver.__exit__ = Mock(return_value=False)
+    receiver.recvfrom.return_value = (b'bytes', ('127.0.0.1', 1))
+    with patch.dict('sys.modules', {'av': av}), \
+            patch('frame_sources.socket.socket', return_value=receiver), \
+            pytest.raises(MemoryError, match='Synthetic allocation failure'):
+        next(decode_av('udp://127.0.0.1:11111'))
+    assert codec.decode.call_count == 1
     receiver.__exit__.assert_called_once()
 
 

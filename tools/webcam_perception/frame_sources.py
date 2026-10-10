@@ -10,6 +10,7 @@ import ipaddress
 import multiprocessing
 from pathlib import Path
 import queue
+import re
 import socket
 import time
 from urllib.parse import urlparse
@@ -151,6 +152,7 @@ def decode_udp_av(uri, av, report_status=None):
     family = socket.AF_INET6 if ipaddress.ip_address(host).version == 6 else socket.AF_INET
     if report_status is not None:
         report_status('creating_h264_decoder')
+    av.logging.set_level(av.logging.ERROR)
     codec = av.CodecContext.create('h264', 'r')
     with socket.socket(family, socket.SOCK_DGRAM) as receiver:
         receiver.bind((host, port))
@@ -160,7 +162,13 @@ def decode_udp_av(uri, av, report_status=None):
             report_status('video_socket_bound')
         sequence = 0
         first_packet = True
+        last_decoded_at = None
+        invalid_packets = 0
+        last_invalid_error = None
         while True:
+            if last_decoded_at is not None and time.monotonic() - last_decoded_at >= 2.0:
+                raise RuntimeError('No decodable H.264 frame for 2 seconds; '
+                                   'last packet error: ' + str(last_invalid_error))
             try:
                 payload, _ = receiver.recvfrom(65535)
             except socket.timeout as error:
@@ -168,6 +176,7 @@ def decode_udp_av(uri, av, report_status=None):
             if not payload:
                 continue
             if first_packet:
+                last_decoded_at = time.monotonic()
                 receiver.settimeout(0.2)
                 if report_status is not None:
                     report_status('first_video_packet')
@@ -175,7 +184,27 @@ def decode_udp_av(uri, av, report_status=None):
             # A datagram is not necessarily a complete encoded frame. Keep parser
             # state across datagrams; only decoder outputs create Frame identities.
             for packet in codec.parse(payload):
-                for image in codec.decode(packet):
+                try:
+                    # Capture per-packet logs rather than letting repeated corrupt
+                    # packet messages flood the diagnostic terminal or IPC queue.
+                    with av.logging.Capture(local=False) as logs:
+                        images = codec.decode(packet)
+                except av.InvalidDataError as error:
+                    invalid_packets += 1
+                    last_invalid_error = str(error)
+                    if invalid_packets == 1 and report_status is not None:
+                        packet_bytes = bytes(packet)
+                        nal_types = sorted({m[1][0] & 31 for m in re.finditer(
+                            b'\x00\x00\x01(.)', packet_bytes[:65536], re.DOTALL)})
+                        report_status('invalid_h264_packet', error_type=type(error).__name__,
+                                      message=str(error), packet_bytes=len(packet_bytes),
+                                      nal_unit_types=nal_types,
+                                      ffmpeg_logs=[str(log)[:1000] for log in logs[-4:]])
+                    continue
+                for image in images:
+                    last_decoded_at = time.monotonic()
+                    if sequence == 0 and invalid_packets and report_status is not None:
+                        report_status('h264_recovered', invalid_packets=invalid_packets)
                     yield frame_from_av(sequence, image, report_status)
                     sequence += 1
 
@@ -198,10 +227,11 @@ def decode_av(uri, report_status=None):
 
 
 def decoder_worker(uri, output, stop, decoder, status_output=None):
-    def report_status(stage):
+    def report_status(stage, **details):
         if status_output is not None:
             try:
-                status_output.put_nowait({'stage': stage, 'mono_ns': time.monotonic_ns()})
+                status_output.put_nowait({'stage': stage, 'mono_ns': time.monotonic_ns(),
+                                         **details})
             except queue.Full:
                 pass
 
@@ -262,7 +292,7 @@ class DecoderSource:
     def start(self):
         context = multiprocessing.get_context('spawn')
         self.output, self.stop = context.Queue(maxsize=1), context.Event()
-        self.status_output = context.Queue(maxsize=8)
+        self.status_output = context.Queue(maxsize=16)
         self.process = context.Process(target=decoder_worker,
                                        args=(self.uri, self.output, self.stop, self.decoder,
                                              self.status_output),
@@ -286,13 +316,13 @@ class DecoderSource:
     def read_progress(self):
         # Status is separate from the latest-frame slot; it never supplies a frame.
         if self.status_output is not None:
-            for _ in range(8):
+            for _ in range(16):
                 try:
                     event = self.status_output.get_nowait()
                 except queue.Empty:
                     break
                 self.progress_events.append(event)
-                self.progress_events = self.progress_events[-8:]
+                self.progress_events = self.progress_events[-16:]
         return list(self.progress_events)
 
     def wait_for_video_socket(self, timeout=10, poll=None):
