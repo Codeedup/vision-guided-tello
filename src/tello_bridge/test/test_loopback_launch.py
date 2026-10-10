@@ -222,6 +222,8 @@ class TestLoopback(unittest.TestCase):
                 try:
                     try:
                         self.wait(lambda: 'Observing' in log_path.read_text(), 5)
+                        self.wait(
+                            lambda: 'All pipeline topics observed.' in log_path.read_text(), 3)
                     except AssertionError:
                         print({'monitor_process': process.poll(),
                                'domain_environment': os.environ.get('ROS_DOMAIN_ID'),

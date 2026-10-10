@@ -444,13 +444,18 @@ def main(argv=None):
     qos = QoSProfile(history=HistoryPolicy.KEEP_LAST, depth=1,
                      reliability=ReliabilityPolicy.RELIABLE,
                      durability=DurabilityPolicy.VOLATILE)
+    announced_ready = False
 
     def callback(topic, message):
+        nonlocal announced_ready
         mono_ns = time.monotonic_ns()
         ros_ns = node.get_clock().now().nanoseconds
         source, decision, usable, state = message_fields(topic, message)
         data.record_message(topic, message, mono_ns)
         event = data.observe(topic, source, decision, ros_ns, mono_ns, usable, state)
+        if not announced_ready and all(stats.messages for stats in data.topics.values()):
+            announced_ready = True
+            print('All pipeline topics observed.', flush=True)
         if event and not data.events_omitted:
             print('TRANSITION ' + json.dumps(event), flush=True)
 
