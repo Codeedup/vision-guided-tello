@@ -127,6 +127,10 @@ def run_diagnostic(transport, duration=2, video=False, decoder_factory=None, sta
             time.sleep(0.01)
     finally:
         observation_ended_ns = time.monotonic_ns()
+        # Import stays dependency-lazy: frame_sources itself does not import PyAV.
+        from frame_sources import DecoderSource
+        if isinstance(decoder, DecoderSource):
+            result['decoder_progress'] = decoder.read_progress()
         result['decoder_error'] = getattr(decoder, 'last_error', None)
         process = getattr(decoder, 'process', None)
         result['decoder_exitcode_at_observation_end'] = (

@@ -5,7 +5,7 @@ import socket
 from types import SimpleNamespace
 
 from diagnose import main, run_diagnostic, VideoPacketProbe
-from frame_sources import decoder_worker
+from frame_sources import decoder_worker, DecoderSource
 import pytest
 from tello_bridge.policy import Telemetry
 from tello_bridge.transport import DIAGNOSTIC_COMMANDS, FakeTransport
@@ -90,6 +90,27 @@ def test_slow_cleanup_does_not_change_observation_end_telemetry_age():
     assert result['cleanup_duration_ms'] == 2000
     assert result['telemetry_age_ms_at_finish'] == (
         result['telemetry_age_ms_at_observation_end'] + 2000)
+
+
+def test_diagnostic_preserves_worker_progress_before_cleanup():
+    class SyntheticSource(DecoderSource):
+        def start(self):
+            self.progress_events = [{'stage': 'opening_video', 'mono_ns': 123}]
+
+        def read(self):
+            return None
+
+        def close(self):
+            self.progress_events.clear()
+
+    source = SyntheticSource('udp://127.0.0.1:11111')
+    with patch('diagnose.time.sleep'):
+        result = run_diagnostic(FakeTransport(), duration=0, video=True,
+                                decoder_factory=lambda: source)
+    assert result['decoder_progress'] == [{'stage': 'opening_video', 'mono_ns': 123}]
+    assert source.progress_events == []
+    assert result['frames'] == 0
+    assert result['events'][-1]['attempt'] == 'streamoff'
 
 
 def test_video_packet_probe_counts_loopback_datagrams_without_frames():

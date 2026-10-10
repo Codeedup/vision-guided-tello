@@ -132,8 +132,10 @@ class RecordedFrames:
         pass
 
 
-def decode_av(uri):
+def decode_av(uri, report_status=None):
     """Yield genuine decoder events, never a library's cached .frame property."""
+    if report_status is not None:
+        report_status('importing_av')
     import av
     open_options = {}
     if uri.startswith('udp://'):
@@ -141,21 +143,41 @@ def decode_av(uri):
         # stream probe before the first decode; file fixtures retain autodetection.
         open_options = {'format': 'h264', 'options': {
             'probesize': '32768', 'analyzeduration': '1000000'}}
+    if report_status is not None:
+        report_status('opening_video')
     with av.open(uri, timeout=(2.0, 0.2), **open_options) as stream:
+        if report_status is not None:
+            report_status('video_opened')
         for sequence, image in enumerate(stream.decode(video=0)):
             receipt_ns, mono_ns = time.time_ns(), time.monotonic_ns()
+            if sequence == 0 and report_status is not None:
+                report_status('first_frame_decoded')
             pixels = image.to_ndarray(format='bgr24')
             yield Frame(sequence, receipt_ns, mono_ns, image.width, image.height,
                         pixels.tobytes(), decoder_pts=image.pts)
 
 
-def decoder_worker(uri, output, stop, decoder):
+def decoder_worker(uri, output, stop, decoder, status_output=None):
+    def report_status(stage):
+        if status_output is not None:
+            try:
+                status_output.put_nowait({'stage': stage, 'mono_ns': time.monotonic_ns()})
+            except queue.Full:
+                pass
+
+    report_status('worker_started')
     try:
-        for frame in decoder(uri):
+        frames = (decoder(uri, report_status=report_status)
+                  if decoder is decode_av else decoder(uri))
+        first_queued = False
+        for frame in frames:
             if stop.is_set():
                 break
             try:
                 output.put_nowait(frame)
+                if not first_queued:
+                    report_status('first_frame_queued')
+                    first_queued = True
             except queue.Full:
                 try:
                     output.get_nowait()
@@ -165,7 +187,9 @@ def decoder_worker(uri, output, stop, decoder):
                     output.put_nowait(frame)
                 except queue.Full:
                     pass
+        report_status('worker_stopped')
     except Exception as error:
+        report_status('worker_error')
         # Parent observes timeout even if a decoder fails without delivering this event.
         try:
             output.put_nowait(('decoder_error', type(error).__name__, str(error)))
@@ -192,17 +216,22 @@ class DecoderSource:
         self.uri, self.decoder = uri, decoder
         self.slot = LatestFrames(timeout_ns)
         self.process = self.output = self.stop = None
+        self.status_output = None
+        self.progress_events = []
         self.last_error = None
 
     def start(self):
         context = multiprocessing.get_context('spawn')
         self.output, self.stop = context.Queue(maxsize=1), context.Event()
+        self.status_output = context.Queue(maxsize=8)
         self.process = context.Process(target=decoder_worker,
-                                       args=(self.uri, self.output, self.stop, self.decoder),
+                                       args=(self.uri, self.output, self.stop, self.decoder,
+                                             self.status_output),
                                        daemon=True)
         self.process.start()
 
     def read(self, now_ns=None):
+        self.read_progress()
         # Max two dequeues bounds callback work even if producer is continuously active.
         for _ in range(2):
             try:
@@ -214,6 +243,18 @@ class DecoderSource:
             else:
                 self.last_error = frame
         return self.slot.read(now_ns)
+
+    def read_progress(self):
+        # Status is separate from the latest-frame slot; it never supplies a frame.
+        if self.status_output is not None:
+            for _ in range(8):
+                try:
+                    event = self.status_output.get_nowait()
+                except queue.Empty:
+                    break
+                self.progress_events.append(event)
+                self.progress_events = self.progress_events[-8:]
+        return list(self.progress_events)
 
     def close(self):
         if self.process is not None:
@@ -228,3 +269,5 @@ class DecoderSource:
             self.process = None
             self.output.cancel_join_thread()
             self.output.close()
+            self.status_output.cancel_join_thread()
+            self.status_output.close()
