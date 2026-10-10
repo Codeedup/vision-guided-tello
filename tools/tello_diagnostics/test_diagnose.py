@@ -95,7 +95,7 @@ def test_slow_cleanup_does_not_change_observation_end_telemetry_age():
 def test_diagnostic_preserves_worker_progress_before_cleanup():
     class SyntheticSource(DecoderSource):
         def start(self):
-            self.progress_events = [{'stage': 'opening_video', 'mono_ns': 123}]
+            self.progress_events = [{'stage': 'video_socket_bound', 'mono_ns': 123}]
 
         def read(self):
             return None
@@ -107,10 +107,61 @@ def test_diagnostic_preserves_worker_progress_before_cleanup():
     with patch('diagnose.time.sleep'):
         result = run_diagnostic(FakeTransport(), duration=0, video=True,
                                 decoder_factory=lambda: source)
-    assert result['decoder_progress'] == [{'stage': 'opening_video', 'mono_ns': 123}]
+    assert result['decoder_progress'] == [{'stage': 'video_socket_bound', 'mono_ns': 123}]
     assert source.progress_events == []
     assert result['frames'] == 0
     assert result['events'][-1]['attempt'] == 'streamoff'
+
+
+def test_diagnostic_waits_for_delayed_socket_readiness_before_streamon():
+    class DelayedSource(DecoderSource):
+        def start(self):
+            self.process = SimpleNamespace(exitcode=None)
+            self.read_count = 0
+
+        def read(self):
+            self.read_count += 1
+            if self.read_count == 3:
+                self.progress_events.append({'stage': 'video_socket_bound', 'mono_ns': 123})
+            return None
+
+        def close(self):
+            self.process = None
+
+    source = DelayedSource('udp://127.0.0.1:11111')
+
+    class ReadyCheckedTransport(FakeTransport):
+        def _send(self, text, mono_ns):
+            if text == 'streamon':
+                assert source.read_count >= 3
+                assert source.progress_events[-1]['stage'] == 'video_socket_bound'
+            super()._send(text, mono_ns)
+
+    with patch('diagnose.time.sleep'):
+        result = run_diagnostic(ReadyCheckedTransport(), duration=0, video=True,
+                                decoder_factory=lambda: source)
+    assert result['events'][-1]['attempt'] == 'streamoff'
+
+
+def test_decoder_setup_failure_does_not_request_video_and_still_cleans_up():
+    class FailedSource(DecoderSource):
+        def start(self):
+            self.process = SimpleNamespace(exitcode=None)
+            self.last_error = ('decoder_error', 'OSError', 'Synthetic bind failure')
+
+        def read(self):
+            return None
+
+        def close(self):
+            self.process = None
+
+    source = FailedSource('udp://127.0.0.1:11111')
+    transport = FakeTransport()
+    with patch('diagnose.time.sleep'), pytest.raises(RuntimeError, match='setup failed'):
+        run_diagnostic(transport, duration=0, video=True, decoder_factory=lambda: source)
+    assert source.process is None
+    assert not transport.connected
+    assert not any(e.get('attempt') in ('streamon', 'streamoff') for e in transport.events)
 
 
 def test_video_packet_probe_counts_loopback_datagrams_without_frames():

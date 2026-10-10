@@ -10,7 +10,9 @@ import ipaddress
 import multiprocessing
 from pathlib import Path
 import queue
+import socket
 import time
+from urllib.parse import urlparse
 
 
 @dataclass(frozen=True)
@@ -132,29 +134,67 @@ class RecordedFrames:
         pass
 
 
+def frame_from_av(sequence, image, report_status=None):
+    receipt_ns, mono_ns = time.time_ns(), time.monotonic_ns()
+    if sequence == 0 and report_status is not None:
+        report_status('first_frame_decoded')
+    pixels = image.to_ndarray(format='bgr24')
+    return Frame(sequence, receipt_ns, mono_ns, image.width, image.height,
+                 pixels.tobytes(), decoder_pts=image.pts)
+
+
+def decode_udp_av(uri, av, report_status=None):
+    """Feed raw UDP chunks to one persistent H.264 parser/decoder."""
+    address = urlparse(uri)
+    host = address.hostname
+    port = 11111 if address.port is None else address.port
+    family = socket.AF_INET6 if ipaddress.ip_address(host).version == 6 else socket.AF_INET
+    if report_status is not None:
+        report_status('creating_h264_decoder')
+    codec = av.CodecContext.create('h264', 'r')
+    with socket.socket(family, socket.SOCK_DGRAM) as receiver:
+        receiver.bind((host, port))
+        # Initial data can take longer than subsequent packets after streamon.
+        receiver.settimeout(2.0)
+        if report_status is not None:
+            report_status('video_socket_bound')
+        sequence = 0
+        first_packet = True
+        while True:
+            try:
+                payload, _ = receiver.recvfrom(65535)
+            except socket.timeout as error:
+                raise TimeoutError('UDP video packet receipt timed out') from error
+            if not payload:
+                continue
+            if first_packet:
+                receiver.settimeout(0.2)
+                if report_status is not None:
+                    report_status('first_video_packet')
+                first_packet = False
+            # A datagram is not necessarily a complete encoded frame. Keep parser
+            # state across datagrams; only decoder outputs create Frame identities.
+            for packet in codec.parse(payload):
+                for image in codec.decode(packet):
+                    yield frame_from_av(sequence, image, report_status)
+                    sequence += 1
+
+
 def decode_av(uri, report_status=None):
     """Yield genuine decoder events, never a library's cached .frame property."""
     if report_status is not None:
         report_status('importing_av')
     import av
-    open_options = {}
     if uri.startswith('udp://'):
-        # Tello sends raw H.264. Avoid format autodetection and a large live
-        # stream probe before the first decode; file fixtures retain autodetection.
-        open_options = {'format': 'h264', 'options': {
-            'probesize': '32768', 'analyzeduration': '1000000'}}
+        yield from decode_udp_av(uri, av, report_status)
+        return
     if report_status is not None:
         report_status('opening_video')
-    with av.open(uri, timeout=(2.0, 0.2), **open_options) as stream:
+    with av.open(uri, timeout=(2.0, 0.2)) as stream:
         if report_status is not None:
             report_status('video_opened')
         for sequence, image in enumerate(stream.decode(video=0)):
-            receipt_ns, mono_ns = time.time_ns(), time.monotonic_ns()
-            if sequence == 0 and report_status is not None:
-                report_status('first_frame_decoded')
-            pixels = image.to_ndarray(format='bgr24')
-            yield Frame(sequence, receipt_ns, mono_ns, image.width, image.height,
-                        pixels.tobytes(), decoder_pts=image.pts)
+            yield frame_from_av(sequence, image, report_status)
 
 
 def decoder_worker(uri, output, stop, decoder, status_output=None):
@@ -207,7 +247,6 @@ class DecoderSource:
 
     def __init__(self, uri, hardware=False, decoder=decode_av, timeout_ns=250_000_000):
         if uri.startswith('udp://'):
-            from urllib.parse import urlparse
             host = urlparse(uri).hostname
             if not hardware and not ipaddress.ip_address(host).is_loopback:
                 raise ValueError('Hardware video requires explicit hardware=True')
@@ -255,6 +294,23 @@ class DecoderSource:
                 self.progress_events.append(event)
                 self.progress_events = self.progress_events[-8:]
         return list(self.progress_events)
+
+    def wait_for_video_socket(self, timeout=10, poll=None):
+        """Standalone setup handshake; never call this from a safety callback."""
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            self.read()
+            if self.last_error is not None:
+                raise RuntimeError('Video receiver setup failed: ' + str(self.last_error))
+            if any(e['stage'] == 'video_socket_bound' for e in self.progress_events):
+                return
+            if self.process.exitcode is not None:
+                raise RuntimeError('Video receiver worker exited before binding')
+            if poll is not None:
+                poll()
+            time.sleep(0.01)
+        stages = [e['stage'] for e in self.progress_events]
+        raise TimeoutError('Video socket setup timed out; progress: ' + str(stages))
 
     def close(self):
         if self.process is not None:

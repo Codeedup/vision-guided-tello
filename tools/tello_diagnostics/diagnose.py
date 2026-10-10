@@ -23,6 +23,7 @@ from tello_bridge.transport import (  # noqa: E402
     FakeTransport,
     UdpSdkTransport,
 )
+from frame_sources import DecoderSource  # noqa: E402
 
 
 class VideoPacketProbe:
@@ -108,6 +109,9 @@ def run_diagnostic(transport, duration=2, video=False, decoder_factory=None, sta
             if decoder_factory:
                 decoder = decoder_factory()
                 decoder.start()
+                if isinstance(decoder, DecoderSource) and decoder.uri.startswith('udp://'):
+                    decoder.wait_for_video_socket(
+                        poll=lambda: transport.poll(time.monotonic_ns()))
             stream_attempted = True
             channel.send('streamon', time.monotonic_ns())
         deadline = time.monotonic() + duration
@@ -127,8 +131,6 @@ def run_diagnostic(transport, duration=2, video=False, decoder_factory=None, sta
             time.sleep(0.01)
     finally:
         observation_ended_ns = time.monotonic_ns()
-        # Import stays dependency-lazy: frame_sources itself does not import PyAV.
-        from frame_sources import DecoderSource
         if isinstance(decoder, DecoderSource):
             result['decoder_progress'] = decoder.read_progress()
         result['decoder_error'] = getattr(decoder, 'last_error', None)
@@ -194,8 +196,6 @@ def main(argv=None):
             return VideoPacketProbe(args.host, args.bind)
         decoder_factory = packet_probe
     elif args.video and args.hardware:
-        from frame_sources import DecoderSource
-
         def hardware_decoder():
             return DecoderSource(f'udp://{args.bind}:11111', hardware=True)
         decoder_factory = hardware_decoder
