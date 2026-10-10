@@ -9,6 +9,7 @@ import json
 import math
 import argparse
 import socket
+from open_palm import is_open_palm
 
 
 
@@ -77,6 +78,7 @@ def main():
                 hand_count = len(result.hand_landmarks)
                 error_x = 0.0
                 error_y = 0.0
+                palm_eligible = False
 
                 image_center = (width // 2, height // 2)
 
@@ -92,6 +94,7 @@ def main():
                 if hand_count == 1:
                     hand = result.hand_landmarks[0]
                     palm_indices = (0, 5, 9, 13, 17)
+                    palm_eligible = is_open_palm(hand, width, height)
 
                     palm_x = sum(hand[i].x for i in palm_indices) / 5
                     palm_y = sum(hand[i].y for i in palm_indices) / 5
@@ -142,6 +145,7 @@ def main():
                 
                 target_valid = (
                     hand_count == 1
+                    and palm_eligible
                     and math.isfinite(error_x)
                     and math.isfinite(error_y)
                     and abs(error_x) <= 1.0
