@@ -1,39 +1,62 @@
 #!/usr/bin/env python3
 """Propeller-off Tello hand preview using only the diagnostic SDK allowlist.
 
-Displays actual decoded camera frames with the shared open-palm gate. No ROS or
-observation UDP output, flight commands, or laptop webcam access.
+Displays actual decoded camera frames with the shared open-palm gate. Optional
+observation UDP output retains decode receipt stamps; no flight commands.
 """
 import argparse
+import hashlib
 import json
 import math
+from pathlib import Path
+import socket
 import time
 
 from diagnose import DecoderSource, run_diagnostic, StateReceiver, UdpSdkTransport
+from decoded_timing import DecodedTiming
 from perception import target_from_landmarks
 
 
 class HandPreview:
-    def __init__(self, cv2, mp, detector):
+    def __init__(self, cv2, mp, detector, sender=None, receiver=None, timing=None):
+        if (sender is None) != (receiver is None) or (timing is not None and sender is None):
+            raise ValueError('Observation sender and destination are required together')
         self.cv2, self.mp, self.detector = cv2, mp, detector
+        self.sender, self.receiver, self.timing = sender, receiver, timing
+        self.sent = 0
         self.last_timestamp = -1
         self.last_report = 0.0
         self.frames = self.eligible_frames = 0
         self.last_observation = None
 
     def __call__(self, sample):
+        marks = {'processing_start_ns': time.monotonic_ns()}
         cv2 = self.cv2
         frame = sample.bgr_array().copy()
         timestamp = max(sample.monotonic_ns // 1_000_000, self.last_timestamp + 1)
         self.last_timestamp = timestamp
         image = self.mp.Image(image_format=self.mp.ImageFormat.SRGB,
                               data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        marks['inference_start_ns'] = time.monotonic_ns()
         result = self.detector.detect_for_video(image, timestamp)
+        marks['inference_done_ns'] = time.monotonic_ns()
         observation = target_from_landmarks(result.hand_landmarks, sample.width,
                                             sample.height, sample.receipt_ns)
         self.last_observation = observation
         self.frames += 1
         self.eligible_frames += int(observation['detected'])
+        marks['mapping_done_ns'] = time.monotonic_ns()
+        if self.sender is not None:
+            # Inference never renews the source stamp. The ROS receiver remains
+            # responsible for rejecting stale/future observations at publication.
+            packet = json.dumps(observation, allow_nan=False).encode('utf-8')
+            sent = self.sender.sendto(packet, self.receiver)
+            marks['send_done_ns'] = time.monotonic_ns()
+            if sent != len(packet):
+                raise OSError('Incomplete observation UDP send')
+            self.sent += 1
+            if self.timing is not None:
+                self.timing.record(sample, observation, marks, sent)
         for hand in result.hand_landmarks:
             for point in hand:
                 cv2.circle(frame, (int(point.x * sample.width), int(point.y * sample.height)),
@@ -60,8 +83,11 @@ class HandPreview:
         return cv2.waitKey(1) & 0xFF != ord('q')
 
     def summary(self):
-        return {'frames': self.frames, 'eligible_frames': self.eligible_frames,
-                'ineligible_frames': self.frames - self.eligible_frames}
+        result = {'frames': self.frames, 'eligible_frames': self.eligible_frames,
+                  'ineligible_frames': self.frames - self.eligible_frames}
+        if self.sender is not None:
+            result['observation_send_attempts'] = self.sent
+        return result
 
 
 def main(argv=None):
@@ -71,11 +97,24 @@ def main(argv=None):
     parser.add_argument('--bind', default='0.0.0.0')
     parser.add_argument('--local-port', type=int, default=8889)
     parser.add_argument('--duration', type=float, default=30)
+    parser.add_argument('--receiver', help='Explicit WSL IPv4 for observation UDP output')
+    parser.add_argument('--port', type=int, default=5005)
+    parser.add_argument('--timing-trace', help='New decoded sender timing JSON; no overwrite')
+    parser.add_argument('--trace-label', default='')
     args = parser.parse_args(argv)
     if not args.hardware:
         parser.error('Physical preview requires explicit --hardware')
     if not math.isfinite(args.duration) or not 0 < args.duration <= 60:
         parser.error('duration must be in (0,60]')
+    if not 1 <= args.port <= 65535:
+        parser.error('port must be in [1,65535]')
+    if args.receiver is not None:
+        try:
+            socket.inet_aton(args.receiver)
+        except OSError:
+            parser.error('receiver must be a numeric IPv4 address')
+    if args.timing_trace and args.receiver is None:
+        parser.error('--timing-trace requires --receiver')
     import cv2
     import mediapipe as mp
     from mediapipe.tasks import python
@@ -87,9 +126,21 @@ def main(argv=None):
     options = vision.HandLandmarkerOptions(
         base_options=python.BaseOptions(model_asset_buffer=verified_model()),
         running_mode=vision.RunningMode.VIDEO, num_hands=2)
+    sender = timing = None
+    completion = 'error'
     try:
+        if args.timing_trace:
+            timing = DecodedTiming(args.timing_trace, metadata={
+                'label': args.trace_label, 'receiver': args.receiver, 'port': args.port,
+                'preview_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+                'opencv': cv2.__version__, 'mediapipe': mp.__version__})
         with vision.HandLandmarker.create_from_options(options) as detector:
-            preview = HandPreview(cv2, mp, detector)
+            if args.receiver is not None:
+                sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                sender.setblocking(False)
+            preview = HandPreview(cv2, mp, detector, sender=sender,
+                                  receiver=None if sender is None else (args.receiver, args.port),
+                                  timing=timing)
             print('Propeller-off camera/hand check. Click the preview and press Q to finish.')
             result = run_diagnostic(
                 transport, duration=args.duration, video=True,
@@ -97,13 +148,20 @@ def main(argv=None):
                 state_source=state, on_frame=preview)
             result['preview_summary'] = preview.summary()
         print(json.dumps(result, indent=2, allow_nan=False))
+        completion = 'completed'
         return 0
     except (OSError, RuntimeError, TimeoutError, KeyboardInterrupt) as error:
         print(json.dumps({'error': str(error), 'fake': False,
                           'events': list(transport.events)}, indent=2))
         return 2
     finally:
-        cv2.destroyAllWindows()
+        try:
+            if sender is not None:
+                sender.close()
+            if timing is not None:
+                timing.finish(completion)
+        finally:
+            cv2.destroyAllWindows()
 
 
 if __name__ == '__main__':

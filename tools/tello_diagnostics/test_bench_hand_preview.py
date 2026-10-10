@@ -1,5 +1,6 @@
 """Synthetic preview checks: shared gate, colours, identity and SDK cleanup."""
 from types import SimpleNamespace
+import json
 from unittest.mock import Mock, patch
 
 from bench_hand_preview import HandPreview, main
@@ -18,7 +19,7 @@ def open_hand():
     return [SimpleNamespace(x=x, y=y) for x, y in OPEN_HAND]
 
 
-def preview_for(hands, key=-1):
+def preview_for(hands, key=-1, **kwargs):
     cv2 = Mock()
     cv2.cvtColor.side_effect = lambda image, colour: image[..., ::-1]
     cv2.waitKey.return_value = key
@@ -26,7 +27,7 @@ def preview_for(hands, key=-1):
                          ImageFormat=SimpleNamespace(SRGB=1))
     detector = Mock()
     detector.detect_for_video.return_value = SimpleNamespace(hand_landmarks=hands)
-    return HandPreview(cv2, mp, detector)
+    return HandPreview(cv2, mp, detector, **kwargs)
 
 
 def test_open_palm_preview_preserves_source_stamp_colour_and_image_error_signs():
@@ -97,8 +98,45 @@ def test_preview_inference_failure_still_closes_and_disables_stream():
     assert transport.events[-1]['attempt'] == 'streamoff'
 
 
+def test_udp_observation_retains_decode_stamp_and_is_sent_before_display():
+    sender = Mock()
+    sender.sendto.side_effect = lambda packet, address: len(packet)
+    timing = Mock()
+    preview = preview_for([open_hand()], sender=sender, receiver=('127.0.0.1', 5005),
+                          timing=timing)
+    actions = Mock()
+    actions.attach_mock(sender.sendto, 'send')
+    actions.attach_mock(preview.cv2.imshow, 'display')
+    with patch('bench_hand_preview.time.monotonic', return_value=0):
+        preview(sample())
+    packet, address = sender.sendto.call_args.args
+    observation = json.loads(packet)
+    assert observation == preview.last_observation
+    assert observation['capture_time_ns'] == 123
+    assert address == ('127.0.0.1', 5005)
+    assert [call[0] for call in actions.mock_calls] == ['send', 'display']
+    assert preview.summary()['observation_send_attempts'] == 1
+    timing.record.assert_called_once()
+    assert timing.record.call_args.args[0].sequence == 0
+
+
+def test_incomplete_observation_send_fails_without_recording_success():
+    sender = Mock()
+    sender.sendto.return_value = 0
+    timing = Mock()
+    preview = preview_for([], sender=sender, receiver=('127.0.0.1', 5005), timing=timing)
+    with pytest.raises(OSError, match='Incomplete observation'):
+        preview(sample())
+    assert preview.sent == 0
+    timing.record.assert_not_called()
+    preview.cv2.imshow.assert_not_called()
+
+
 @pytest.mark.parametrize('args', [[], ['--hardware', '--duration', 'nan'],
-                                  ['--hardware', '--duration', '61']])
+                                  ['--hardware', '--duration', '61'],
+                                  ['--hardware', '--receiver', 'invalid'],
+                                  ['--hardware', '--port', '0'],
+                                  ['--hardware', '--timing-trace', 'new.json']])
 def test_preview_validates_explicit_hardware_and_duration_before_activation(args):
     with patch('bench_hand_preview.UdpSdkTransport') as transport, \
             pytest.raises(SystemExit) as error:
