@@ -75,7 +75,8 @@ class VideoPacketProbe:
             self.socket = None
 
 
-def run_diagnostic(transport, duration=2, video=False, decoder_factory=None, state_source=None):
+def run_diagnostic(transport, duration=2, video=False, decoder_factory=None, state_source=None,
+                   on_frame=None):
     channel = DiagnosticChannel(transport)
     decoder = None
     stream_attempted = False
@@ -122,12 +123,15 @@ def run_diagnostic(transport, duration=2, video=False, decoder_factory=None, sta
                 telemetry = state_source.read(mono_ns)
                 if telemetry is not None:
                     result['telemetry'] = asdict(telemetry)
-            if decoder is not None and decoder.read() is not None:
+            sample = None if decoder is None else decoder.read()
+            if sample is not None:
                 result['frames'] += 1
                 if last_frame_ns is not None:
                     gap = (mono_ns - last_frame_ns) / 1e6
                     maximum_gap_ms = max(maximum_gap_ms or 0, gap)
                 last_frame_ns = mono_ns
+                if on_frame is not None and on_frame(sample) is False:
+                    break
             time.sleep(0.01)
     finally:
         observation_ended_ns = time.monotonic_ns()
