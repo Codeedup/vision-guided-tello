@@ -3,6 +3,7 @@
 
 Displays actual decoded camera frames with the shared open-palm gate. Optional
 observation UDP output retains decode receipt stamps; no flight commands.
+Headless comparisons retain the same detector and gate without GUI work.
 """
 import argparse
 import hashlib
@@ -18,11 +19,13 @@ from perception import target_from_landmarks
 
 
 class HandPreview:
-    def __init__(self, cv2, mp, detector, sender=None, receiver=None, timing=None):
+    def __init__(self, cv2, mp, detector, sender=None, receiver=None, timing=None,
+                 show_preview=True):
         if (sender is None) != (receiver is None) or (timing is not None and sender is None):
             raise ValueError('Observation sender and destination are required together')
         self.cv2, self.mp, self.detector = cv2, mp, detector
         self.sender, self.receiver, self.timing = sender, receiver, timing
+        self.show_preview = show_preview
         self.sent = 0
         self.last_timestamp = -1
         self.last_report = 0.0
@@ -32,7 +35,9 @@ class HandPreview:
     def __call__(self, sample):
         marks = {'processing_start_ns': time.monotonic_ns()}
         cv2 = self.cv2
-        frame = sample.bgr_array().copy()
+        frame = sample.bgr_array()
+        if self.show_preview:
+            frame = frame.copy()  # Annotation must not modify the decoded source.
         timestamp = max(sample.monotonic_ns // 1_000_000, self.last_timestamp + 1)
         self.last_timestamp = timestamp
         image = self.mp.Image(image_format=self.mp.ImageFormat.SRGB,
@@ -57,6 +62,12 @@ class HandPreview:
             self.sent += 1
             if self.timing is not None:
                 self.timing.record(sample, observation, marks, sent)
+        now = time.monotonic()
+        if now - self.last_report >= 0.5:
+            print(json.dumps(observation, allow_nan=False))
+            self.last_report = now
+        if not self.show_preview:
+            return True
         for hand in result.hand_landmarks:
             for point in hand:
                 cv2.circle(frame, (int(point.x * sample.width), int(point.y * sample.height)),
@@ -75,10 +86,6 @@ class HandPreview:
         for index, text in enumerate(lines):
             cv2.putText(frame, text, (15, 30 + 30 * index), cv2.FONT_HERSHEY_SIMPLEX,
                         0.55, (0, 255, 0), 2)
-        now = time.monotonic()
-        if now - self.last_report >= 0.5:
-            print(json.dumps(observation, allow_nan=False))
-            self.last_report = now
         cv2.imshow('Tello hand detection (propellers removed)', frame)
         return cv2.waitKey(1) & 0xFF != ord('q')
 
@@ -101,6 +108,8 @@ def main(argv=None):
     parser.add_argument('--port', type=int, default=5005)
     parser.add_argument('--timing-trace', help='New decoded sender timing JSON; no overwrite')
     parser.add_argument('--trace-label', default='')
+    parser.add_argument('--headless', action='store_true',
+                        help='Compare inference and UDP timing without drawing/displaying frames')
     args = parser.parse_args(argv)
     if not args.hardware:
         parser.error('Physical preview requires explicit --hardware')
@@ -133,15 +142,19 @@ def main(argv=None):
             timing = DecodedTiming(args.timing_trace, metadata={
                 'label': args.trace_label, 'receiver': args.receiver, 'port': args.port,
                 'preview_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-                'opencv': cv2.__version__, 'mediapipe': mp.__version__})
+                'opencv': cv2.__version__, 'mediapipe': mp.__version__,
+                'preview_enabled': not args.headless, 'num_hands': 2})
         with vision.HandLandmarker.create_from_options(options) as detector:
             if args.receiver is not None:
                 sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 sender.setblocking(False)
             preview = HandPreview(cv2, mp, detector, sender=sender,
                                   receiver=None if sender is None else (args.receiver, args.port),
-                                  timing=timing)
-            print('Propeller-off camera/hand check. Click the preview and press Q to finish.')
+                                  timing=timing, show_preview=not args.headless)
+            if args.headless:
+                print('Propeller-off headless hand check. Ctrl+C stops; duration is bounded.')
+            else:
+                print('Propeller-off camera/hand check. Click the preview and press Q to finish.')
             result = run_diagnostic(
                 transport, duration=args.duration, video=True,
                 decoder_factory=lambda: DecoderSource(f'udp://{args.bind}:11111', hardware=True),
@@ -161,7 +174,8 @@ def main(argv=None):
             if timing is not None:
                 timing.finish(completion)
         finally:
-            cv2.destroyAllWindows()
+            if not args.headless:
+                cv2.destroyAllWindows()
 
 
 if __name__ == '__main__':
