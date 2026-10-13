@@ -12,11 +12,15 @@ import json
 import math
 from pathlib import Path
 import socket
+import sys
 import time
 
-from decoded_timing import DecodedTiming
-from diagnose import DecoderSource, run_diagnostic, StateReceiver, UdpSdkTransport
-from perception import target_from_landmarks
+ROOT = Path(__file__).resolve().parents[2]
+# CLI startup must not depend on diagnose's import side effects or PYTHONPATH.
+sys.path.insert(0, str(ROOT / 'tools/webcam_perception'))
+from decoded_timing import DecodedTiming  # noqa: E402
+from diagnose import DecoderSource, run_diagnostic, StateReceiver, UdpSdkTransport  # noqa: E402
+from perception import target_from_landmarks  # noqa: E402
 
 
 class HandPreview:
