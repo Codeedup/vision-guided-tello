@@ -12,3 +12,7 @@ __pycache__/
 /tools/webcam_perception/models/*.task
 /.pytest_cache/
 /artifacts/
+
+# Local measurement evidence; keep on disk, never publish raw runs by accident.
+/tello-*.json
+/webcam-timing-*.json

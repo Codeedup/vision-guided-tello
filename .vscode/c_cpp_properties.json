@@ -11,7 +11,7 @@
             "cppStandard": "gnu++17",
             "intelliSenseMode": "linux-gcc-x64",
             "compileCommands": [
-                "/home/dylan/vision_guided_tello_ws/build/tracking_controller/compile_commands.json"
+                "${workspaceFolder}/build/tracking_controller/compile_commands.json"
             ]
         }
     ],
