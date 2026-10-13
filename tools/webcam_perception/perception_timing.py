@@ -38,7 +38,8 @@ def software_identity():
     def git(*arguments):
         commands = [['git', '-C', str(root), *arguments]]
         path = PureWindowsPath(str(root))
-        if os.name == 'nt' and path.drive.lower().startswith(('\\\\wsl.localhost\\', '\\\\wsl$\\')):
+        wsl_share = path.drive.lower().startswith(('\\\\wsl.localhost\\', '\\\\wsl$\\'))
+        if os.name == 'nt' and wsl_share:
             distro = path.drive.split('\\')[-1]
             linux_root = '/' + '/'.join(path.parts[1:])
             commands.append(['wsl.exe', '-d', distro, '--', 'git', '-C', linux_root, *arguments])

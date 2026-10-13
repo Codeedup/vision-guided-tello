@@ -28,7 +28,8 @@ def main(argv=None):
     timing = None
     if args.timing_trace:
         timing = FrameTiming(args.timing_trace, metadata={
-            'label': args.trace_label, 'revision': args.revision or software_identity()['revision'],
+            'label': args.trace_label,
+            'revision': args.revision or software_identity()['revision'],
             'hand_preview_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
             'opencv': getattr(cv2, '__version__', 'UNKNOWN'),
             'mediapipe': getattr(mp, '__version__', 'UNKNOWN'),
