@@ -1,5 +1,8 @@
 # Architecture and authority
 
+Current audit: [requirement/code/test matrix](readiness_2026-10-13.md).
+Operating procedure: [staged commissioning runbook](commissioning_runbook.md).
+
 The existing C++ policies remain the single source of tracking/supervisor policy.
 The bridge independently validates their approved output at the transport boundary.
 
@@ -14,7 +17,9 @@ The bridge independently validates their approved output at the transport bounda
 
 Positive image x is right; positive image y is down. Gain 20, inclusive independent
 ±0.08 dead zones and ±10 clamps remain in the C++ controller. Vertical sign is
-inverted. Scalars are not calibrated metres per second. Freshness is strictly
+inverted. These are defaults: read-only gain/dead-zone and independent axis caps
+can be reduced for staged tests (zero isolates the other axis). The bridge also
+caps integer RC output. Scalars are not calibrated metres per second. Freshness is strictly
 less than 250 ms for source and local receipt; the supervisor requires five
 distinct observations. Its 1.5 s acquisition/loss timer starts on the first safety
 update in ACQUIRE/LOST_HOVER, and is reset in TRACK. Watchdogs run every 20 ms.
@@ -71,6 +76,15 @@ neutralizes, attempts normal land if authority was active, and closes resources;
 it never calls emergency motor cut. After process death or host/Wi-Fi failure,
 software cannot guarantee delivery or cleanup. In-memory latches are lost on
 restart; restart is disabled with lifecycle unknown and explicit rearming required.
+
+The boundary additionally limits each explicit arm session to 60 seconds by
+monotonic elapsed time, including acquisition. `maximum_session_ns` is configurable;
+repeated arm and lease heartbeats cannot extend it. Expiry neutralizes and latches
+landing. This is a development-session bound, not aircraft endurance evidence.
+Read-only bridge parameters expose all `Limits` fields, including battery/height,
+operator and telemetry timeouts, retries and independent integer axis caps.
+`landing_delivery` distinguishes pending unconfirmed requests, exhausted unconfirmed
+attempts and an unavailable link. It never claims physical landing.
 
 One local lock owns each fake namespace or hardware endpoint. This cannot arbitrate
 Windows and WSL or two laptops: choose one physical command owner after routing

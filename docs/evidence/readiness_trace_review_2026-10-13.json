@@ -1,0 +1,123 @@
+{
+  "classification": "historical user measurements, reanalyzed 2026-10-13",
+  "runs": [
+    {
+      "local_file": "tello-perf-preview-sender-6655ff2111c1496abd873ad151e926fe.json",
+      "sha256": "ce7e28b041f54a3b80fb864989b57e57fbc5622810d6be029864317c625400d2",
+      "preview_enabled": true,
+      "completion": "completed",
+      "frames_omitted": 0,
+      "groups": {
+        "all": {
+          "frames": 725,
+          "inference_p50_ms": 47.3642
+        },
+        "eligible": {
+          "frames": 516,
+          "inference_p50_ms": 47.769999999999996
+        },
+        "one_ineligible": {
+          "frames": 178,
+          "inference_p50_ms": 47.4039
+        },
+        "none": {
+          "frames": 26,
+          "inference_p50_ms": 24.455550000000002
+        },
+        "multiple": {
+          "frames": 5,
+          "inference_p50_ms": 130.5217
+        }
+      }
+    },
+    {
+      "local_file": "tello-perf-headless-check-sender-2d80cbb7de2249f79ab6eaede7dc0bca.json",
+      "sha256": "89926f03be2ed097ba92c464d5139c8b1736ad5329713cc6eab64df933fe14de",
+      "preview_enabled": false,
+      "completion": "completed",
+      "frames_omitted": 0,
+      "groups": {
+        "all": {
+          "frames": 1581,
+          "inference_p50_ms": 19.0093
+        },
+        "eligible": {
+          "frames": 1402,
+          "inference_p50_ms": 19.1341
+        },
+        "one_ineligible": {
+          "frames": 7,
+          "inference_p50_ms": 20.9418
+        },
+        "none": {
+          "frames": 172,
+          "inference_p50_ms": 10.752099999999999
+        }
+      }
+    },
+    {
+      "local_file": "tello-target-loss-headless-sender-81aecaeeabb0454b8697e69b9f67f7ff.json",
+      "sha256": "b5f7c2b3641ae3487b2bf97290877a229074004f30429a5ae76bb0b90a4edb0d",
+      "preview_enabled": false,
+      "completion": "completed",
+      "frames_omitted": 0,
+      "groups": {
+        "all": {
+          "frames": 611,
+          "inference_p50_ms": 86.1352
+        },
+        "eligible": {
+          "frames": 490,
+          "inference_p50_ms": 86.3357
+        },
+        "one_ineligible": {
+          "frames": 68,
+          "inference_p50_ms": 91.4187
+        },
+        "none": {
+          "frames": 42,
+          "inference_p50_ms": 49.803349999999995
+        },
+        "multiple": {
+          "frames": 11,
+          "inference_p50_ms": 88.6475
+        }
+      }
+    }
+  ],
+  "historical_loss_analysis": {
+    "schema": "fake_target_loss_audit",
+    "passed": false,
+    "errors": [
+      "Monitor requires a run ID and clean recorded revision",
+      "Missing paired bridge evidence",
+      "Run ID/revision mismatch: operator",
+      "Run ID/revision mismatch: sender",
+      "Sender model hash missing",
+      "Sender revision is dirty or unknown",
+      "Missing matched Windows/WSL clock evidence",
+      "No sustained 5-second TRACK interval ending in loss",
+      "No observed landing request near 1.5 seconds after loss",
+      "No 3-second hand absence followed by eligible hand return"
+    ],
+    "run_id": "tello-target-loss-headless",
+    "revision": "5397129da8ba4394655b8f73adf5df82e7217019",
+    "maximum_completed_track_s": 0.11994645700000106,
+    "loss_elapsed_s": null,
+    "landing_elapsed_s": null,
+    "observed_loss_to_land_s": null,
+    "hand_return_elapsed_s": null,
+    "limitations": [
+      "Passive depth-1 monitoring can miss messages/transitions.",
+      "Observed timing is not exact fault onset or physical stopping.",
+      "A landing request and SDK reply never confirm physical landing.",
+      "Intentional removal and test setup require the operator record."
+    ]
+  },
+  "limitations": [
+    "These are separate live sessions, not a controlled same-recording comparison.",
+    "The difference persists within eligible-hand samples; causality remains unproven.",
+    "Raw traces remain local and are ignored by Git.",
+    "An analyzer failure for missing newer metadata does not retrospectively prove a runtime safety defect."
+  ]
+}

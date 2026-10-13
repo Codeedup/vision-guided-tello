@@ -1,5 +1,9 @@
 # Windows/WSL setup and operation
 
+Use the [current staged runbook](commissioning_runbook.md) for the next enabled
+FAKE target-loss repeat, matched run IDs/clock evidence and camera-only ownership.
+The installation and basic webcam recipes below remain reference instructions.
+
 Keep source in `~/vision_guided_tello_ws`. The Windows venv is an interpreter
 environment, not a second source tree. ROS runs on WSL Ubuntu 24.04 / Jazzy with
 system Python 3.12. Existing Windows webcam Python 3.14 is user-reported.
@@ -61,7 +65,8 @@ Windows wheel resolution passed locally using cross-platform pip download. It
 is not a Windows installation/inference/camera result. A separate clean Linux
 Python 3.12 install and explicit model-load test are recorded in offline validation.
 Optional decoder requirements are in `requirements-video.txt`; install only into
-the selected video runtime. Real Tello decoding/network routing remains untested.
+the selected video runtime. User evidence now includes actual Tello diagnostics,
+telemetry and decoded video on Windows. Production real actuation remains gated.
 
 **WSL terminal C**, read-only checks and baseline monitor:
 

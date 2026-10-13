@@ -1,5 +1,10 @@
 # Offline validation boundaries
 
+The [13 October readiness audit](readiness_2026-10-13.md) and
+[current checkpoint](current_checkpoint.md) supersede historical status below.
+Both launcher suites, mock signal/callback teardown, session and axis limits,
+clock evidence, bounded replay and target-loss evidence analysis are registered.
+
 Use `tools/run_offline_checks.sh` from a Jazzy WSL checkout. It builds all packages,
 runs registered tests and uses `colcon test-result --verbose` to fail on reported
 failures (a `colcon test` process exit alone is insufficient). Webcam receiver,
@@ -102,9 +107,8 @@ plant measurement. The stationary webcam is never presented as closed-loop conve
 
 The checked-in GitHub Actions workflow uses Ubuntu 24.04 with ROS Jazzy, actual
 registered tests, an optional real decoder fixture check, pure tests without a ROS
-environment and uploaded result artifacts. It was prepared locally and not pushed
-or run on GitHub in this assignment. Container/package availability remains a
-remote CI check; local results are not substituted for a hosted run.
+environment and uploaded result artifacts. The current checkpoint links revision
+and validation evidence; local results never substitute for a hosted run.
 
 Known existing skip inventory: ten cppcheck entries (five each in controller and
 mission manager), skipped by the installed ament wrapper because cppcheck 2.13.0
@@ -113,7 +117,7 @@ this preparation does not newly suppress them or claim they passed. No ROS/syste
 package was replaced to bypass the wrapper. Separate newer cppcheck validation
 remains outstanding; the reported skipped static analysis is not behaviour coverage.
 
-Unrun by design: webcam/Windows runtime, sustained live/load trials, aircraft
+Unrun by design: live webcam/Windows camera trials, sustained live/load trials, aircraft
 networking, standard-Tello SDK/video compatibility, physical manual control,
 used-battery capacity, calibrated command signs/speeds/stopping response, physical
 landing confirmation and all flight trials. Those need the staged user acceptance

@@ -1,0 +1,116 @@
+{
+  "date": "2026-10-13",
+  "software_revision": "3e098392038177b3372fdcebd0f192473d807ea1",
+  "release_revision_note": "The final release adds documentation/evidence only; git rev-parse HEAD and its GitHub Actions run identify that exact release revision.",
+  "offline": {
+    "packages_built": 5,
+    "reported_entries": 507,
+    "errors": 0,
+    "failures": 0,
+    "skipped": 10,
+    "count_note": "Includes lint/result wrappers; pure selections overlap registered tests."
+  },
+  "expected_skips": [
+    {
+      "package": "tracking_controller",
+      "entries": 5,
+      "reason": "Installed ament wrapper skips cppcheck 2.13.0 due to recorded performance issues"
+    },
+    {
+      "package": "mission_manager",
+      "entries": 5,
+      "reason": "Installed ament wrapper skips cppcheck 2.13.0 due to recorded performance issues"
+    }
+  ],
+  "inherited_exclusions": [
+    "copyright and cpplint are disabled in existing controller/mission-manager CMake; not claimed as passes"
+  ],
+  "checks": [
+    {
+      "name": "full_offline",
+      "command": "tools/run_offline_checks.sh",
+      "exit_code": 0,
+      "local_log": "artifacts/readiness-2026-10-13/final-validated-offline.log",
+      "log_sha256": "de52421145c7473b9b809b43b0271b402cd6ccebbffd9e54e95fa48f6095e157"
+    },
+    {
+      "name": "pure_policies",
+      "command": "PYTHONPATH=src/tello_bridge:tools/webcam_perception:tools/tello_diagnostics python3 -m pytest -q src/tello_bridge/test/test_boundary.py src/tello_bridge/test/test_timing.py tools/webcam_perception/test_measure_pipeline.py tools/webcam_perception/test_frame_sources.py tools/webcam_perception/test_open_palm.py tools/webcam_perception/test_model_asset.py tools/webcam_perception/test_perception_timing.py tools/tello_diagnostics/test_diagnose.py",
+      "exit_code": 0,
+      "local_log": "artifacts/readiness-2026-10-13/final-pure-policy.log",
+      "log_sha256": "8de4cca4cf4ee963148f9a30575a34b90d38ab845ca54207de6e9ab57b8b34e4"
+    },
+    {
+      "name": "optional_decoder",
+      "command": "python3 -m venv --system-site-packages artifacts/readiness-2026-10-13/video-venv; artifacts/readiness-2026-10-13/video-venv/bin/pip install -r tools/webcam_perception/requirements-video.txt; artifacts/readiness-2026-10-13/video-venv/bin/python tools/webcam_perception/check_decoder.py",
+      "exit_code": 0,
+      "local_log": "artifacts/readiness-2026-10-13/final-decoder.log",
+      "log_sha256": "92224e09d9b34fcdf7927400ae8a7802dd436e1c646863f1015b7dc53b5dcc9f"
+    }
+  ],
+  "pure_policy_passed": 152,
+  "launcher_checks": [
+    {
+      "scenario": "normal",
+      "revision": "524ca2894e16962014a4b9da0f55ee5be7419719",
+      "exit_code": 0,
+      "trace_completion": "shutdown",
+      "events_retained": 973,
+      "events_omitted": 0,
+      "observation_port_released": true,
+      "leftover_pipeline_processes": false,
+      "duplicate_rejected": true
+    },
+    {
+      "scenario": "node-loss",
+      "revision": "524ca2894e16962014a4b9da0f55ee5be7419719",
+      "exit_code": 1,
+      "trace_completion": "shutdown",
+      "events_retained": 848,
+      "events_omitted": 0,
+      "observation_port_released": true,
+      "leftover_pipeline_processes": false,
+      "duplicate_rejected": false
+    }
+  ],
+  "windows_synthetic_replay": {
+    "completion": "frame_limit",
+    "frames_processed": 12,
+    "metadata": {
+      "revision": "524ca2894e16962014a4b9da0f55ee5be7419719",
+      "working_tree_dirty": true,
+      "model_sha256": "fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1",
+      "label": "offline-synthetic-check",
+      "preview_enabled": false,
+      "input_sha256": "8fe16d01a6f8d5ba996490765cf8e454e7e70202d08882a82c61a8f025ef14d2",
+      "opencv": "5.0.0",
+      "mediapipe": "1.1.0",
+      "num_hands": 2,
+      "maximum_frames": 12,
+      "maximum_seconds": 60
+    },
+    "classification": "Actual Windows runtime and model with synthetic black frames, no camera/SDK or representative palm performance claim"
+  },
+  "windows_clock_offline_smoke": {
+    "lower_ms": -0.180018,
+    "upper_ms": 0.049382,
+    "round_trip_ms": 0.2294,
+    "schema": "windows_wsl_clock_bounds",
+    "label": "offline-runtime-check",
+    "checked_at_ns": 1791884604098068800,
+    "samples": 10
+  },
+  "repository_cleanup": {
+    "raw_measurement_files_retained_and_ignored": 28,
+    "build_install_logs_venv_models_recordings_excluded": true,
+    "editor_paths_made_portable": true
+  },
+  "hardware_activity_performed": false,
+  "remaining_blockers": [
+    "Matched enabled live FAKE target-loss repeat with sustained tracking and hand return",
+    "Representative Windows recording/preview comparison; live inference slowdown cause remains unproven",
+    "Single physical command-owner/deployment route and trustworthy lifecycle/telemetry evidence",
+    "Real actuation gateway, ground commissioning, physical override/manual baseline and all controlled flight trials"
+  ],
+  "hosted_ci": "The final response links the concluded GitHub Actions run for the pushed release; local results do not substitute for hosted CI."
+}

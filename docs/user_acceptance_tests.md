@@ -1,5 +1,11 @@
 # Your next tests
 
+The [13 October commissioning runbook](commissioning_runbook.md) supersedes the
+ordering below. The disabled headless baseline and launcher cleanup have user
+evidence; the enabled sustained target-loss sequence remains pending. Use the
+[current requirement/code/test audit](readiness_2026-10-13.md) before further tests.
+The original checklist below remains background for the broader acceptance work.
+
 Start with the laptop baseline below. All command consumers remain fake. The
 aircraft, flight controls and webcam have not been opened during this offline
 implementation. Setup/terminal commands are in [Windows/WSL setup](windows_wsl_setup.md).

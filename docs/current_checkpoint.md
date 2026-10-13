@@ -1,4 +1,49 @@
-# Offline preparation checkpoint — 10 October 2026
+# Current readiness checkpoint — 13 October 2026
+
+The full handoff was reviewed before edits, local commit `35ee9c1` preserved,
+and concrete CI/lifecycle findings repaired. Source validation revision:
+`3e098392038177b3372fdcebd0f192473d807ea1`. The release commit adds documentation/evidence only;
+`git rev-parse HEAD` identifies the final checkout. Consult the
+[GitHub workflow](https://github.com/Codeedup/vision-guided-tello/actions/workflows/offline.yml)
+for that exact release revision; local success alone is not hosted CI success.
+
+**Current state: software checks pass; bench/flight readiness remains blocked.**
+The immediate next user test is the enabled headless FAKE target-loss repeat in
+[the staged runbook](commissioning_runbook.md), with matched clock/run/revision
+traces, ≥5 s actual TRACK, ≥3 s hand absence and ≥5 s eligible hand return without
+restart. The historical ~0.12 s TRACK interval does not pass. Real ROS actuation
+still rejects hardware mode; no aircraft connection or flight occurred here.
+
+Validation:
+
+- Full offline build/test: **507 reported entries, 0 errors, 0 failures, 10 skips**.
+  The ten skips are inherited ament/cppcheck 2.13.0 performance exclusions, five
+  each in controller and mission manager. Existing copyright/cpplint exclusions
+  remain explicit. Counts include wrappers, not 507 distinct flight behaviours.
+- Standalone pure-policy selection: **152 passed**, overlapping registered suites.
+- Optional PyAV 19.0.1 lossless synthetic decode/colour/identity check passed.
+- Actual launcher: duplicate ownership rejected; normal stop exit 0; receiver-loss
+  exit 1; completed traces, no child errors/leftovers, observation port released.
+- Actual Windows environment: direct diagnostic CLI startup, 12-frame headless
+  synthetic replay with the actual model/OpenCV, and bounded Windows/WSL clock
+  probe passed. No live camera, SDK or palm performance claim follows.
+- All 28 local raw measurement JSON files retained and ignored. Generated
+  build/install/log/venv/model/recording artifacts stay out of Git. Editor paths
+  now use the workspace folder instead of a personal absolute directory.
+
+The [requirement/code/test matrix](readiness_2026-10-13.md) lists implemented
+checks and unresolved blockers, including the physical command-owner route,
+trustworthy hover/landed telemetry, critical fault coverage, independent operator
+abort, representative timing comparison and all commissioned physical trials.
+A configurable 60-second session cap and independent lower axis limits now support
+staged tests; defaults remain uncalibrated development settings.
+[Exact commands, logs/hashes and limitations](evidence/readiness_validation_2026-10-13.json)
+and [historical timing reanalysis](evidence/readiness_trace_review_2026-10-13.json)
+preserve the evidence. Raw logs remain under ignored `artifacts/`.
+
+Everything below is the historical 10 October record, not current status.
+
+## Historical offline preparation checkpoint — 10 October 2026
 
 Current live debugging checkpoint: the latest user handoff records eligible webcam
 input and supervisor TRACK, but independent bridge operator-lease expiry. The

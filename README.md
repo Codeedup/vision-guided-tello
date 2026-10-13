@@ -4,7 +4,7 @@ Keep one eligible open hand near the image centre using lateral and vertical
 translation. Laptop perception feeds the existing ROS 2 Jazzy C++ controller and
 supervisor. Autonomous forward/backward and yaw stay zero. Distance remains manual.
 
-The offline preparation now includes a passive evidence monitor, actual loopback
+The software includes a passive evidence monitor, actual loopback
 UDP/ROS tests, an independently guarded **fake** command bridge, operator leases,
 frame sources, and an explicitly invoked non-actuating SDK/video diagnostic.
 Normal launch starts disabled. Hardware ROS actuation remains gated pending real
@@ -12,7 +12,7 @@ network, lifecycle and operator-control evidence. This checkpoint is not flight 
 
 ```mermaid
 flowchart LR
-  V[Webcam / recorded / proposed Tello decoder] --> P[Open-hand perception]
+  V[Webcam / recorded / Tello camera-only decoder] --> P[Open-hand perception]
   P -->|timestamped UDP| R[ROS receiver]
   R -->|HandTarget| C[C++ controller]
   C -->|CandidateCommand| S[C++ supervisor]
@@ -43,9 +43,14 @@ Each demo requires a new output directory and writes synthetic reports/logs.
 It explicitly enables the software mock and fake bridge for a bounded session;
 ordinary launches require a separate operator enable.
 
-The current laptop gate is the operator lease timing failure. Follow the
-[paired FAKE timing diagnostic recipe](docs/lease_timing_debug.md) before repeating
-acceptance. The [staged acceptance matrix](docs/user_acceptance_tests.md) follows.
+The current user test is a clean enabled FAKE target-loss repeat: at least five
+seconds of actual tracking, deliberate removal, latched landing intent, then hand
+return without restart. The earlier 0.12-second tracking interval did not pass.
+Follow the [staged commissioning runbook](docs/commissioning_runbook.md), with
+Windows/WSL terminals, new clock evidence and paired traces. The
+[readiness audit](docs/readiness_2026-10-13.md) maps requirements to code/tests and
+lists the remaining physical-mode design and hardware blockers. Per-axis limits
+and a 60-second development session cap are configurable; defaults are not flight tuned.
 See [Windows/WSL setup](docs/windows_wsl_setup.md), [authority and interfaces](docs/architecture.md),
 [offline validation](docs/offline_validation.md), [current checkpoint](docs/current_checkpoint.md)
 and [dependency/model provenance](docs/provenance.md).
