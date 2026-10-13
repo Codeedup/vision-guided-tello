@@ -1,8 +1,8 @@
 """Exercise the complete diagnostic/cleanup paths with traps for flight commands."""
-from unittest.mock import Mock, patch
 from queue import Queue
 import socket
 from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 from diagnose import main, run_diagnostic, VideoPacketProbe
 from frame_sources import decoder_worker, DecoderSource
@@ -232,7 +232,7 @@ def test_packet_diagnostic_binds_before_streamon_and_reports_before_cleanup():
     assert result['video_packet_probe']['packets'] == 1
     assert result['video_packet_probe']['bytes'] == 9
     assert result['decoder_error'] is None
-    assert set(e['attempt'] for e in result['events'] if 'attempt' in e) <= DIAGNOSTIC_COMMANDS
+    assert {e['attempt'] for e in result['events'] if 'attempt' in e} <= DIAGNOSTIC_COMMANDS
     assert result['events'][-1]['attempt'] == 'streamoff'
     assert probe.socket is None
     assert not transport.connected

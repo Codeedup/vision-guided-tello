@@ -13,6 +13,8 @@ if(BUILD_TESTING)
   find_package(launch_testing_ament_cmake REQUIRED)
   ament_add_pytest_test(model_tests test/test_model.py
     APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR})
+  ament_add_pytest_test(shutdown_tests test/test_shutdown.py TIMEOUT 30
+    APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR})
   add_launch_test(test/test_closed_loop_launch.py TIMEOUT 120
     RUNNER "${ament_cmake_ros_DIR}/run_test_isolated.py")
 endif()

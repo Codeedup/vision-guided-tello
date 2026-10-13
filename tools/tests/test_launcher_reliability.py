@@ -1,8 +1,7 @@
 """Non-ROS regression tests. Live Jazzy acceptance is documented separately."""
 import argparse
-import importlib.util
+from contextlib import ExitStack
 import json
-import os
 from pathlib import Path
 import signal
 import socket
@@ -11,12 +10,11 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
-from contextlib import ExitStack
 
 TOOLS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOLS))
-import start_webcam_pipeline as launcher
-import pipeline_diagnostics as diagnostics
+import pipeline_diagnostics as diagnostics  # noqa: E402
+import start_webcam_pipeline as launcher  # noqa: E402
 
 
 class PreflightTests(unittest.TestCase):
@@ -70,7 +68,8 @@ class PreflightTests(unittest.TestCase):
         self.assertNotIn('bridge_trace:=', command)
         self.assertNotIn('trace_label:=', command)
         args.bridge_trace = '/tmp/trace with spaces.json'
-        self.assertIn('bridge_trace:=/tmp/trace with spaces.json', launcher.build_launch_command(args))
+        self.assertIn('bridge_trace:=/tmp/trace with spaces.json',
+                      launcher.build_launch_command(args))
 
     def test_trace_requires_parseable_matching_shutdown(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -79,8 +78,8 @@ class PreflightTests(unittest.TestCase):
                 self.assertFalse(launcher.check_trace(path, '/webcam_test'))
                 path.write_text('')
                 self.assertFalse(launcher.check_trace(path, '/webcam_test'))
-                valid = dict(completion='shutdown', events_retained=1,
-                             metadata=dict(role='bridge', fake=True, namespace='/webcam_test'))
+                valid = {'completion': 'shutdown', 'events_retained': 1,
+                         'metadata': {'role': 'bridge', 'fake': True, 'namespace': '/webcam_test'}}
                 path.write_text(json.dumps(valid))
                 self.assertTrue(launcher.check_trace(path, '/webcam_test'))
                 self.assertFalse(launcher.check_trace(path, '/another'))
@@ -92,10 +91,10 @@ class PreflightTests(unittest.TestCase):
 class GraphTests(unittest.TestCase):
     def graph(self):
         ns = '/webcam_test'
-        return dict(namespace=ns, node_counts={ns + '/' + n: 1 for n in diagnostics.NODES},
-                    use_sim_time={ns + '/' + n: False for n in diagnostics.NODES},
-                    topics={ns + '/' + t: {'publishers': [{'node': ns + '/' + n, 'type': typ}]}
-                            for t, (n, typ) in diagnostics.TOPICS.items()})
+        return {'namespace': ns, 'node_counts': {ns + '/' + n: 1 for n in diagnostics.NODES},
+                'use_sim_time': {ns + '/' + n: False for n in diagnostics.NODES},
+                'topics': {ns + '/' + t: {'publishers': [{'node': ns + '/' + n, 'type': typ}]}
+                           for t, (n, typ) in diagnostics.TOPICS.items()}}
 
     def test_complete_graph_passes(self):
         self.assertEqual(diagnostics.graph_errors(self.graph()), [])
@@ -126,9 +125,9 @@ class GraphTests(unittest.TestCase):
             self.assertTrue(diagnostics.graph_errors(graph))
 
     def test_disabled_fresh_output_and_fake_unarmed_status_required(self):
-        approved = dict(receipt=10.0, flags=[False, False, False], values=[0.0, 0.0])
-        bridge = dict(fake=True, armed=False, awaiting_enabled=False,
-                      upstream_disabled=True, landing_latched=False)
+        approved = {'receipt': 10.0, 'flags': [False, False, False], 'values': [0.0, 0.0]}
+        bridge = {'fake': True, 'armed': False, 'awaiting_enabled': False,
+                  'upstream_disabled': True, 'landing_latched': False}
         self.assertEqual(diagnostics.disabled_errors(approved, bridge, 10.1), [])
         self.assertTrue(diagnostics.disabled_errors(approved, bridge, 10.6))
         for key in bridge:
@@ -166,19 +165,22 @@ class WrapperTests(unittest.TestCase):
 
         launch.poll.side_effect = poll_launch
         with ExitStack() as stack:
-            stack.enter_context(patch.object(sys, 'argv', ['launcher', '--namespace', 'webcam_test']))
-            stack.enter_context(patch.object(launcher.signal, 'signal', side_effect=install_signal))
+            stack.enter_context(patch.object(
+                sys, 'argv', ['launcher', '--namespace', 'webcam_test']))
+            stack.enter_context(patch.object(
+                launcher.signal, 'signal', side_effect=install_signal))
             stack.enter_context(patch.object(launcher, 'acquire_lock', return_value=MagicMock()))
             stack.enter_context(patch.object(launcher, 'check_port', side_effect=port_error))
             stack.enter_context(patch.object(launcher, 'run_check', side_effect=checks))
-            stack.enter_context(patch.object(launcher.subprocess, 'run',
-                                            return_value=MagicMock(returncode=0, stdout='revision')))
+            stack.enter_context(patch.object(
+                launcher.subprocess, 'run',
+                return_value=MagicMock(returncode=0, stdout='revision')))
             popen = stack.enter_context(patch.object(launcher.subprocess, 'Popen',
                                                      side_effect=[launch, takeover]))
-            stack.enter_context(patch.object(launcher, 'group_alive',
-                                            side_effect=lambda p: p is launch))
-            stack.enter_context(patch.object(launcher, 'stop_group',
-                                            side_effect=lambda p: events.append('stop') or True))
+            stack.enter_context(patch.object(
+                launcher, 'group_alive', side_effect=lambda p: p is launch))
+            stack.enter_context(patch.object(
+                launcher, 'stop_group', side_effect=lambda p: events.append('stop') or True))
             stack.enter_context(patch.object(launcher, 'check_trace', return_value=True))
             output = stack.enter_context(patch('builtins.print'))
             code = launcher.main()
@@ -234,7 +236,7 @@ class ProcessGroupTests(unittest.TestCase):
     def test_stop_signals_children_and_waits_for_trace_cleanup(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            child_code = '''import signal, sys, time
+            child_code = """import signal, sys, time
 from pathlib import Path
 root = Path(sys.argv[1])
 def stop(sig, frame):
@@ -243,11 +245,11 @@ def stop(sig, frame):
 signal.signal(signal.SIGINT, stop)
 (root / 'child-ready').write_text('ready')
 while True: time.sleep(.01)
-'''
+"""
             child_path = root / 'child.py'
             child_path.write_text(child_code)
             parent_path = root / 'parent.py'
-            parent_path.write_text('''import signal, subprocess, sys, time
+            parent_path.write_text("""import signal, subprocess, sys, time
 from pathlib import Path
 root = Path(sys.argv[1])
 child = subprocess.Popen([sys.executable, str(root / 'child.py'), str(root)])
@@ -259,7 +261,7 @@ signal.signal(signal.SIGINT, stop)
 while not (root / 'child-ready').exists(): time.sleep(.01)
 print('ready', flush=True)
 while True: time.sleep(.01)
-''')
+""")
             process = subprocess.Popen([sys.executable, str(parent_path), str(root)],
                                        start_new_session=True, stdout=subprocess.PIPE, text=True)
             try:

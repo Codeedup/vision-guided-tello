@@ -1,6 +1,6 @@
 """Synthetic preview checks: shared gate, colours, identity and SDK cleanup."""
-from types import SimpleNamespace
 import json
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from bench_hand_preview import HandPreview, main

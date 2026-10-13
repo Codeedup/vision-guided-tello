@@ -4,19 +4,20 @@ import csv
 import json
 import math
 from pathlib import Path
+import signal
 import time
 
 from drone_interfaces.msg import ApprovedCommand, HandTarget
+from mock_tello.model import Config, Decision, ImagePlane, scenario_input, SCENARIOS
 from rcl_interfaces.msg import ParameterDescriptor
 import rclpy
 from rclpy.clock import Clock
 from rclpy.clock_type import ClockType
-from rclpy.executors import ExternalShutdownException
+from rclpy.executors import ExternalShutdownException, SingleThreadedExecutor
 from rclpy.node import Node
+from rclpy.signals import SignalHandlerOptions
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
-
-from mock_tello.model import Config, Decision, ImagePlane, SCENARIOS, scenario_input
 
 
 def stamp_ns(stamp):
@@ -138,7 +139,8 @@ class MockTello(Node):
         if not self.world.gate.reset_allowed(
                 self.get_clock().now().nanoseconds, time.monotonic()):
             response.success = False
-            response.message = 'Reset requires a fresh disabled supervisor decision; take over first.'
+            response.message = (
+                'Reset requires a fresh disabled supervisor decision; take over first.')
             return response
         # Keep replay protection across reset; clear pending old observations.
         high_water = self.world.gate.high_water_ns
@@ -147,7 +149,8 @@ class MockTello(Node):
         self.run_index += 1
         self.started_at = self.last_step = time.monotonic()
         response.success = True
-        response.message = 'Mock reset to prepositioned hover. Explicit supervisor re-enable required.'
+        response.message = (
+            'Mock reset to prepositioned hover. Explicit supervisor re-enable required.')
         return response
 
     def destroy_node(self):
@@ -157,15 +160,33 @@ class MockTello(Node):
 
 
 def main(args=None):
-    rclpy.init(args=args)
+    # rclpy's default signal thread can shut the context down while a callback
+    # or take_message is using it. Request a stop without interrupting that work;
+    # this thread owns executor, node and context teardown in that order.
+    stopping = False
+
+    def request_stop(signum, frame):
+        nonlocal stopping
+        stopping = True
+
+    rclpy.init(args=args, signal_handler_options=SignalHandlerOptions.NO)
+    handlers = {sig: signal.signal(sig, request_stop)
+                for sig in (signal.SIGINT, signal.SIGTERM)}
     node = None
+    executor = SingleThreadedExecutor()
     try:
         node = MockTello()
-        rclpy.spin(node)
+        executor.add_node(node)
+        while not stopping and rclpy.ok():
+            executor.spin_once(timeout_sec=0.05)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
-        if node is not None:
-            node.destroy_node()
-        if rclpy.ok():
-            rclpy.shutdown()
+        try:
+            executor.shutdown()
+            if node is not None:
+                node.destroy_node()
+            rclpy.try_shutdown()
+        finally:
+            for sig, handler in handlers.items():
+                signal.signal(sig, handler)

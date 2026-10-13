@@ -102,7 +102,8 @@ def main():
                     'node': ep.node_namespace.rstrip('/') + '/' + ep.node_name,
                     'type': ep.topic_type, 'qos': str(ep.qos_profile)} for ep in info]}
         if args.expect_empty:
-            observed_conflicts.update(name for name, count in result['node_counts'].items() if count)
+            observed_conflicts.update(
+                name for name, count in result['node_counts'].items() if count)
             observed_conflicts.update(name for name, value in result['topics'].items()
                                       if value['publisher_count'])
 
@@ -160,13 +161,16 @@ def main():
             if args.require_disabled:
                 result['errors'].extend(disabled_errors(approved, bridge, time.monotonic()))
                 if unsafe_approved_seen:
-                    result['errors'].append('Enabled/nonneutral/landing output observed during startup')
+                    result['errors'].append(
+                        'Enabled/nonneutral/landing output observed during startup')
         if not args.skip_packages:
-            for package in ('drone_interfaces', 'tracking_controller', 'mission_manager', 'tello_bridge'):
-                command = ['ros2', 'pkg', 'prefix' if package == 'drone_interfaces' else 'executables',
-                           package]
+            for package in ('drone_interfaces', 'tracking_controller',
+                            'mission_manager', 'tello_bridge'):
+                lookup = 'prefix' if package == 'drone_interfaces' else 'executables'
+                command = ['ros2', 'pkg', lookup, package]
                 process = subprocess.run(command, capture_output=True, text=True, timeout=5)
-                result[package] = {'exit_code': process.returncode, 'output': process.stdout.strip()}
+                result[package] = {'exit_code': process.returncode,
+                                   'output': process.stdout.strip()}
                 if process.returncode:
                     result['errors'].append('Package lookup failed: ' + package)
         result['ok'] = not result['errors']

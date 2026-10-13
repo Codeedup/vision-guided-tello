@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Propeller-off Tello hand preview using only the diagnostic SDK allowlist.
+"""
+Propeller-off Tello hand preview using only the diagnostic SDK allowlist.
 
 Displays actual decoded camera frames with the shared open-palm gate. Optional
 observation UDP output retains decode receipt stamps; no flight commands.
@@ -13,8 +14,8 @@ from pathlib import Path
 import socket
 import time
 
-from diagnose import DecoderSource, run_diagnostic, StateReceiver, UdpSdkTransport
 from decoded_timing import DecodedTiming
+from diagnose import DecoderSource, run_diagnostic, StateReceiver, UdpSdkTransport
 from perception import target_from_landmarks
 
 

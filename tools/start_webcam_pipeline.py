@@ -209,7 +209,8 @@ def main():
                         print('Takeover cleanup incomplete; preserve logs.', flush=True)
                         failed = True
                 except (OSError, subprocess.TimeoutExpired):
-                    print('Takeover cleanup failed/timed out; stopping owned pipeline.', flush=True)
+                    print('Takeover cleanup failed/timed out; stopping owned pipeline.',
+                          flush=True)
                     failed = True
                 finally:
                     if takeover is not None and group_alive(takeover):

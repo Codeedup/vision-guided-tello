@@ -17,13 +17,13 @@ import time
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'src/tello_bridge'))
 sys.path.insert(0, str(ROOT / 'tools/webcam_perception'))
+from frame_sources import DecoderSource  # noqa: E402
 from tello_bridge.telemetry import StateReceiver  # noqa: E402
 from tello_bridge.transport import (  # noqa: E402
     DiagnosticChannel,
     FakeTransport,
     UdpSdkTransport,
 )
-from frame_sources import DecoderSource  # noqa: E402
 
 
 class VideoPacketProbe:
