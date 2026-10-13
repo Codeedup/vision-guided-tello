@@ -180,7 +180,7 @@ class WrapperTests(unittest.TestCase):
             stack.enter_context(patch.object(
                 launcher, 'group_alive', side_effect=lambda p: p is launch))
             stack.enter_context(patch.object(
-                launcher, 'stop_group', side_effect=lambda p: events.append('stop') or True))
+                launcher, 'stop_group', side_effect=lambda p, **kw: events.append('stop') or True))
             stack.enter_context(patch.object(launcher, 'check_trace', return_value=True))
             output = stack.enter_context(patch('builtins.print'))
             code = launcher.main()
@@ -233,6 +233,54 @@ class WrapperTests(unittest.TestCase):
 
 
 class ProcessGroupTests(unittest.TestCase):
+    def test_noninteractive_launch_forwards_exactly_one_child_signal(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            child = root / 'forwarded_child.py'
+            child.write_text("""import signal, sys, time
+from pathlib import Path
+count = 0
+def stop(sig, frame):
+    global count
+    count += 1
+signal.signal(signal.SIGINT, stop)
+print('ready', flush=True)
+while not count: time.sleep(.01)
+time.sleep(.1)
+Path(sys.argv[1]).write_text(str(count))
+""")
+            parent = root / 'forwarding_launch.py'
+            parent.write_text("""import signal, subprocess, sys, time
+child = subprocess.Popen([sys.executable, sys.argv[1], sys.argv[2]],
+                         stdout=subprocess.PIPE, text=True)
+assert child.stdout.readline().strip() == 'ready'
+def stop(sig, frame):
+    child.send_signal(signal.SIGINT)
+    child.wait(timeout=3)
+    raise SystemExit(0)
+signal.signal(signal.SIGINT, stop)
+print('ready', flush=True)
+while True: time.sleep(.01)
+""")
+            count = root / 'signal-count'
+            process = subprocess.Popen(
+                [sys.executable, str(parent), str(child), str(count)],
+                start_new_session=True, stdout=subprocess.PIPE, text=True)
+            try:
+                import selectors
+                with selectors.DefaultSelector() as selector:
+                    selector.register(process.stdout, selectors.EVENT_READ)
+                    self.assertTrue(selector.select(timeout=5), 'Fixture failed to start')
+                self.assertEqual(process.stdout.readline().strip(), 'ready')
+                with patch('builtins.print'):
+                    self.assertTrue(launcher.stop_group(process, launch_noninteractive=True))
+                self.assertEqual(count.read_text(), '1')
+                self.assertEqual(process.returncode, 0)
+            finally:
+                launcher.signal_group(process, signal.SIGKILL)
+                process.wait(timeout=3)
+                process.stdout.close()
+
     def test_stop_signals_children_and_waits_for_trace_cleanup(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

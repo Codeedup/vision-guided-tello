@@ -78,14 +78,23 @@ def signal_group(process, signum):
         pass
 
 
-def stop_group(process):
-    # SIGINT goes to our isolated group, not only ros2 launch. Launch can treat
-    # a signal delivered just to its PID as if children also received Ctrl+C.
+def stop_group(process, *, launch_noninteractive=False):
+    # Jazzy launch forwards SIGINT itself in noninteractive mode. Sending it to
+    # the group as well can interrupt child destruction with a second signal.
+    # Interactive launch assumes terminal-wide delivery; generic helpers also
+    # need the group signal. Escalation always reaches the entire owned group.
     for signum, grace in ((signal.SIGINT, 12), (signal.SIGTERM, 5), (signal.SIGKILL, 2)):
         if not group_alive(process):
             return True
         print('Stopping owned process group with ' + signal.Signals(signum).name, flush=True)
-        signal_group(process, signum)
+        if (launch_noninteractive and signum == signal.SIGINT
+                and process.poll() is None):
+            try:
+                process.send_signal(signum)
+            except ProcessLookupError:
+                signal_group(process, signum)
+        else:
+            signal_group(process, signum)
         deadline = time.monotonic() + grace
         while time.monotonic() < deadline:
             if not group_alive(process):
@@ -216,7 +225,7 @@ def main():
                     if takeover is not None and group_alive(takeover):
                         if not stop_group(takeover):
                             failed = True
-                if not stop_group(launch):
+                if not stop_group(launch, launch_noninteractive=not sys.stdin.isatty()):
                     print('Owned process group still present; do not restart.', flush=True)
                     failed = True
             if not check_trace(args.bridge_trace, args.namespace):
