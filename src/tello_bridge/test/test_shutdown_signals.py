@@ -2,6 +2,7 @@
 
 import json
 import os
+from pathlib import Path
 import signal
 import subprocess
 import sys
@@ -96,3 +97,36 @@ def test_active_bridge_shutdown_signals_write_complete_trace(tmp_path, stop_sign
             process.communicate(timeout=3)
         node.destroy_node()
         rclpy.shutdown()
+
+
+@pytest.mark.parametrize('stop_signal', [signal.SIGINT, signal.SIGTERM])
+def test_receiver_repeated_signals_do_not_interrupt_callback_or_cleanup(stop_signal):
+    root = Path(__file__).resolve().parents[3]
+    code = """
+import os
+import signal
+import time
+import rclpy
+from ros_hand_receiver import WebcamReceiver, main
+original = WebcamReceiver.receive_packets
+def receive(self):
+    original(self)
+    for _ in range(2):
+        os.kill(os.getpid(), int(os.environ['RECEIVER_STOP_SIGNAL']))
+        time.sleep(0.05)
+        assert rclpy.ok(), 'Receiver context stopped during callback'
+        original(self)
+    print('RECEIVER_CALLBACK_COMPLETED', flush=True)
+WebcamReceiver.receive_packets = receive
+main()
+assert not rclpy.ok()
+print('RECEIVER_SHUTDOWN_COMPLETED', flush=True)
+"""
+    env = dict(os.environ, RECEIVER_STOP_SIGNAL=str(int(stop_signal)))
+    env['PYTHONPATH'] = os.pathsep.join(
+        [str(root / 'tools/webcam_perception'), env.get('PYTHONPATH', '')])
+    result = subprocess.run([sys.executable, '-c', code, '--bind', '127.0.0.1', '--port', '0'],
+                            env=env, capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert 'RECEIVER_CALLBACK_COMPLETED' in result.stdout
+    assert 'RECEIVER_SHUTDOWN_COMPLETED' in result.stdout

@@ -4,12 +4,14 @@
 import argparse
 import json
 import math
+import signal
 import socket
 
 from drone_interfaces.msg import HandTarget
 import rclpy
-from rclpy.executors import ExternalShutdownException
+from rclpy.executors import ExternalShutdownException, SingleThreadedExecutor
 from rclpy.node import Node
+from rclpy.signals import SignalHandlerOptions
 
 MAX_AGE_NS = 250_000_000
 
@@ -167,21 +169,37 @@ def main():
     if not 0 <= args.port <= 65535:
         parser.error('--port must be in [0,65535]')
 
-    rclpy.init(args=ros_args)
+    stopping = False
+
+    def request_stop(signum, frame):
+        nonlocal stopping
+        stopping = True
+
+    # Keep the context alive through callbacks and socket/node cleanup. Launch
+    # and its process group can both deliver stop signals during the same exit.
+    rclpy.init(args=ros_args, signal_handler_options=SignalHandlerOptions.NO)
+    handlers = {sig: signal.signal(sig, request_stop)
+                for sig in (signal.SIGINT, signal.SIGTERM)}
     node = None
+    executor = SingleThreadedExecutor()
 
     try:
         node = WebcamReceiver(args.bind, args.port, args.namespace)
-        rclpy.spin(node)
+        executor.add_node(node)
+        while not stopping and rclpy.ok():
+            executor.spin_once(timeout_sec=0.05)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
-        if node is not None:
-            node.receiver.close()
-            node.destroy_node()
-
-        if rclpy.ok():
-            rclpy.shutdown()
+        try:
+            executor.shutdown()
+            if node is not None:
+                node.receiver.close()
+                node.destroy_node()
+            rclpy.try_shutdown()
+        finally:
+            for sig, handler in handlers.items():
+                signal.signal(sig, handler)
 
 
 if __name__ == '__main__':
