@@ -5,7 +5,7 @@ from pathlib import Path
 import platform
 import time
 
-from perception_timing import distribution
+from perception_timing import distribution, software_identity
 
 
 class DecodedTiming:
@@ -15,7 +15,7 @@ class DecodedTiming:
         self.frames = deque(maxlen=capacity)
         self.total = 0
         self.file = Path(path).expanduser().open('x', encoding='utf-8')
-        self.metadata = dict(metadata or {}, source='tello_video',
+        self.metadata = dict(software_identity(), **(metadata or {}), source='tello_video',
                              python=platform.python_version(), platform=platform.platform(),
                              wall_anchor_ns=time.time_ns(), mono_anchor_ns=time.monotonic_ns())
 

@@ -32,6 +32,7 @@ class HandPreview:
         self.last_report = 0.0
         self.frames = self.eligible_frames = 0
         self.last_observation = None
+        self.last_inference_ns = None
 
     def __call__(self, sample):
         marks = {'processing_start_ns': time.monotonic_ns()}
@@ -46,6 +47,7 @@ class HandPreview:
         marks['inference_start_ns'] = time.monotonic_ns()
         result = self.detector.detect_for_video(image, timestamp)
         marks['inference_done_ns'] = time.monotonic_ns()
+        self.last_inference_ns = marks['inference_done_ns'] - marks['inference_start_ns']
         observation = target_from_landmarks(result.hand_landmarks, sample.width,
                                             sample.height, sample.receipt_ns)
         self.last_observation = observation

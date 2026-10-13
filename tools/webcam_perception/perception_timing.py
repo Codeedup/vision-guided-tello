@@ -3,9 +3,13 @@
 from collections import deque
 import hashlib
 import json
-from pathlib import Path
+import os
+from pathlib import Path, PureWindowsPath
 import platform
+import subprocess
 import time
+
+from model_asset import MODEL_SHA256
 
 MARKS = ('read_start_ns', 'read_done_ns', 'copy_done_ns', 'preprocess_done_ns',
          'inference_done_ns', 'annotation_done_ns', 'mapping_done_ns', 'encode_done_ns',
@@ -25,6 +29,32 @@ PHASES = {
     'capture_to_send_ns': ('capture_mono_ns', 'send_done_ns'),
     'loop_total_ns': ('read_start_ns', 'preview_done_ns'),
 }
+
+
+def software_identity():
+    """Collect revision/configuration provenance once, outside timed callbacks."""
+    root = Path(__file__).resolve().parents[2]
+
+    def git(*arguments):
+        commands = [['git', '-C', str(root), *arguments]]
+        path = PureWindowsPath(str(root))
+        if os.name == 'nt' and path.drive.lower().startswith(('\\\\wsl.localhost\\', '\\\\wsl$\\')):
+            distro = path.drive.split('\\')[-1]
+            linux_root = '/' + '/'.join(path.parts[1:])
+            commands.append(['wsl.exe', '-d', distro, '--', 'git', '-C', linux_root, *arguments])
+        for command in commands:
+            try:
+                result = subprocess.run(command, capture_output=True, text=True,
+                                        timeout=2, check=True)
+                return result.stdout.strip()
+            except (OSError, subprocess.SubprocessError):
+                continue
+        return None
+
+    dirty = git('status', '--porcelain', '--untracked-files=no')
+    return {'revision': os.environ.get('TELLO_REVISION') or git('rev-parse', 'HEAD'),
+            'working_tree_dirty': None if dirty is None else bool(dirty),
+            'model_sha256': MODEL_SHA256}
 
 
 def distribution(values):
@@ -55,7 +85,8 @@ class FrameTiming:
         self.last_capture_ns = self.last_send_ns = self.last_preview_ns = None
         self.started_ns = time.monotonic_ns()
         wall_anchor_ns = time.time_ns()
-        self.metadata = dict(metadata or {}, python=platform.python_version(),
+        self.metadata = dict(software_identity(), **(metadata or {}),
+                             python=platform.python_version(),
                              platform=platform.platform(), wall_time_ns=wall_anchor_ns,
                              mono_anchor_ns=self.started_ns,
                              timing_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest())

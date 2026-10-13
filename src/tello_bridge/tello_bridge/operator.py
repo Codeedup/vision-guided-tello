@@ -28,6 +28,7 @@ def main(argv=None):
     parser.add_argument('--reset-mock', action='store_true',
                         help='Explicit synthetic session: reset the mock before enable')
     parser.add_argument('--trace', help='New FAKE-only client timing report (no overwrite)')
+    parser.add_argument('--trace-label', default='', help='Shared run ID for evidence pairing')
     parser.add_argument('--legacy-heartbeat-cadence', action='store_true',
                         help='FAKE-only comparison with the original unpaced loop')
     args = parser.parse_args(argv)
@@ -130,6 +131,7 @@ def main(argv=None):
                     trace = TimingTrace(
                         args.trace, fake=True,
                         metadata={'role': 'operator', 'namespace': args.namespace,
+                                  'label': args.trace_label,
                                   'operator_sha256': source_hash(__file__),
                                   'requested_duration_s': args.duration,
                                   'cadence': ('legacy' if args.legacy_heartbeat_cadence

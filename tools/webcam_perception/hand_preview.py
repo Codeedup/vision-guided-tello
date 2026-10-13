@@ -12,7 +12,7 @@ from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from model_asset import verified_model
 from perception import target_from_landmarks
-from perception_timing import FrameTiming
+from perception_timing import FrameTiming, software_identity
 
 
 def main(argv=None):
@@ -21,14 +21,14 @@ def main(argv=None):
     parser.add_argument('--port', type=int, default=5005)
     parser.add_argument('--timing-trace', help='New bounded sender timing JSON; no overwrite')
     parser.add_argument('--trace-label', default='')
-    parser.add_argument('--revision', default='UNRECORDED')
+    parser.add_argument('--revision', default=None)
     args = parser.parse_args(argv)
     if not 1 <= args.port <= 65535:
         parser.error('Invalid UDP port')
     timing = None
     if args.timing_trace:
         timing = FrameTiming(args.timing_trace, metadata={
-            'label': args.trace_label, 'revision': args.revision,
+            'label': args.trace_label, 'revision': args.revision or software_identity()['revision'],
             'hand_preview_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
             'opencv': getattr(cv2, '__version__', 'UNKNOWN'),
             'mediapipe': getattr(mp, '__version__', 'UNKNOWN'),
