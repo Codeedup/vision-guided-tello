@@ -58,9 +58,11 @@ class TestClosedLoop(unittest.TestCase):
             self.node.create_subscription(ApprovedCommand, 'approved_command',
                                           self.record_approved, 100),
             self.node.create_subscription(HandTarget, 'hand_target',
-                                          lambda msg: self.targets.append((time.monotonic(), msg)), 100),
+                                          lambda msg: self.targets.append(
+                                              (time.monotonic(), msg)), 100),
             self.node.create_subscription(CandidateCommand, 'candidate_command',
-                                          lambda msg: self.candidates.append((time.monotonic(), msg)), 100),
+                                          lambda msg: self.candidates.append(
+                                              (time.monotonic(), msg)), 100),
             self.node.create_subscription(String, 'mock_tello/state',
                                           lambda msg: self.states.append(
                                               (time.monotonic(), json.loads(msg.data))), 100),
@@ -105,25 +107,38 @@ class TestClosedLoop(unittest.TestCase):
             rclpy.spin_once(self.node, timeout_sec=0.01)
 
     def service(self, client, request):
-        future = client.call_async(request)
-        self.wait(future.done)
-        response = future.result()
-        self.assertIsNotNone(response)
+        response = self.try_service(client, request, timeout=3)
+        self.assertIsNotNone(response, 'Service response timed out')
         return response
+
+    def try_service(self, client, request, timeout):
+        future = client.call_async(request)
+        deadline = time.monotonic() + timeout
+        while not future.done() and time.monotonic() < deadline:
+            rclpy.spin_once(self.node, timeout_sec=0.01)
+        if not future.done():
+            future.cancel()
+            return None
+        return future.result()
 
     def disable_and_reset(self):
         self.assertTrue(self.service(self.takeover, Trigger.Request()).success)
         barrier = self.node.get_clock().now().nanoseconds
         self.wait(lambda: any(not msg.autonomy_enabled and self.stamp(msg.header.stamp) >= barrier
                               for _, msg in self.approved))
-        # A service response/probe receipt does not imply the mock received the
-        # disabled heartbeat. Retry a bounded reset until that independent edge arrives.
+        # Graph discovery does not prove the service response reader is matched;
+        # RMW can time out sending the first reply. Only this disabled test reset
+        # is safe to repeat if its response is lost (no flight/enable side effect).
+        # Also wait for the mock's independent receipt of the disabled heartbeat.
         deadline = time.monotonic() + 3
         while True:
-            response = self.service(self.reset, Trigger.Request())
-            if response.success:
+            remaining = max(0, deadline - time.monotonic())
+            response = self.try_service(
+                self.reset, Trigger.Request(), timeout=min(0.25, remaining))
+            if response is not None and response.success:
                 break
-            self.assertLess(time.monotonic(), deadline, response.message)
+            message = 'Reset response not received' if response is None else response.message
+            self.assertLess(time.monotonic(), deadline, message)
             self.pump(0.02)
         self.approved.clear()
         self.output_floor = barrier
@@ -187,7 +202,8 @@ class TestClosedLoop(unittest.TestCase):
         missing = [i for i, (_, msg) in enumerate(self.targets) if not msg.detected]
         first_good = self.targets[missing[-1] + 1][1]
         recovery = next(msg for _, msg in self.approved if msg.tracking_allowed
-                        and self.stamp(msg.source_header.stamp) >= self.stamp(first_good.header.stamp))
+                        and self.stamp(msg.source_header.stamp) >=
+                        self.stamp(first_good.header.stamp))
         good_after = {self.stamp(msg.header.stamp) for _, msg in self.targets[missing[-1] + 1:]
                       if msg.detected and self.stamp(msg.header.stamp)
                       <= self.stamp(recovery.source_header.stamp)}
@@ -223,6 +239,29 @@ class TestClosedLoop(unittest.TestCase):
                                     - self.stamp(latest_target.header.stamp) / 1e9)
         self.assertGreaterEqual(approximate_delivery_age, 0.28)
         self.assertTrue(all(not msg.target_valid for _, msg in self.candidates))
+
+    def test_disabled_reset_retries_an_unobserved_first_response(self):
+        original = self.try_service
+        attempts = 0
+
+        def lose_first_reset(client, request, timeout):
+            nonlocal attempts
+            response = original(client, request, timeout)
+            if client is self.reset:
+                attempts += 1
+                if attempts == 1:
+                    # Exercise the actual server-side reset, then discard its
+                    # response as if the DDS response reader was not matched yet.
+                    self.assertIsNotNone(response)
+                    self.assertTrue(response.success)
+                    return None
+            return response
+
+        self.try_service = lose_first_reset
+        self.disable_and_reset()
+        self.assertGreaterEqual(attempts, 2)
+        self.assertLess(self.states[-1][1]['elapsed'], 0.5)
+        self.assertTrue(all(not msg.autonomy_enabled for _, msg in self.approved))
 
     def test_mock_neutralizes_when_supervisor_process_is_suspended(self, proc_info, processes):
         self.acquire()
