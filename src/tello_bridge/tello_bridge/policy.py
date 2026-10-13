@@ -33,6 +33,9 @@ class Limits:
     input_loss_land_ns: int = 1_500_000_000
     maximum_land_attempts: int = 3
     land_retry_ns: int = 1_000_000_000
+    maximum_session_ns: int = 60_000_000_000
+    maximum_lateral_command: int = 10
+    maximum_vertical_command: int = 10
 
     def __post_init__(self):
         values = vars(self)
@@ -43,9 +46,12 @@ class Limits:
         if not 0 <= self.minimum_height_cm < self.maximum_height_cm:
             raise ValueError('Height bounds are inconsistent')
         for key in ('telemetry_timeout_ns', 'operator_timeout_ns', 'input_loss_land_ns',
-                    'maximum_land_attempts', 'land_retry_ns'):
+                    'maximum_land_attempts', 'land_retry_ns', 'maximum_session_ns'):
             if type(values[key]) is not int or values[key] <= 0:
                 raise ValueError(key + ' must be a positive integer')
+        for key in ('maximum_lateral_command', 'maximum_vertical_command'):
+            if type(values[key]) is not int or not 0 <= values[key] <= 10:
+                raise ValueError(key + ' must be an integer in [0,10]')
 
 
 @dataclass(frozen=True)
@@ -87,6 +93,7 @@ class Authority:
         self.source_watermark = 0
         self.disabled_seen = False
         self.arm_barrier_ns = 0
+        self.arm_started_ns = None
         self.operator_receipt_ns = None
         self.last_ros_ns = self.last_mono_ns = None
         self.loss_start_ns = None
@@ -108,6 +115,7 @@ class Authority:
         self.command = None
         self.receipt_ns = None
         self.operator_receipt_ns = None
+        self.arm_started_ns = None
         self.loss_start_ns = None
         self.reason = reason
 
@@ -135,7 +143,9 @@ class Authority:
 
     def telemetry_ok(self, mono_ns):
         data = self.telemetry
-        if data is None or not 0 <= mono_ns - data.receipt_ns < self.limits.telemetry_timeout_ns:
+        if (not isinstance(data, Telemetry) or type(data.receipt_ns) is not int
+                or data.receipt_ns < 0 or not
+                0 <= mono_ns - data.receipt_ns < self.limits.telemetry_timeout_ns):
             return False
         battery, height = data.battery_percent, data.height_cm
         if any(type(v) not in (float, int) or not math.isfinite(v) for v in (battery, height)):
@@ -146,11 +156,15 @@ class Authority:
     def arm(self, ros_ns, mono_ns):
         if not self.clock_ok(ros_ns, mono_ns):
             return False
+        if self.armed:
+            # Repeated arm requests cannot renew either the session or the lease.
+            return False
         if (not self.connected or not self.disabled_seen or self.landing_latched
                 or self.flight_state != 'HOVER_CONFIRMED' or not self.telemetry_ok(mono_ns)):
             self.reason = 'ARM_INTERLOCK'
             return False
         self.arm_barrier_ns = ros_ns
+        self.arm_started_ns = mono_ns
         self.armed = True
         self.awaiting_enabled = True
         self.disabled_seen = False
@@ -225,7 +239,10 @@ class Authority:
         if not self.clock_ok(ros_ns, mono_ns):
             return ('rc', (0, 0, 0, 0))
         if self.armed:
-            if not self.telemetry_ok(mono_ns) or self.flight_state != 'HOVER_CONFIRMED':
+            if (self.arm_started_ns is None or
+                    mono_ns - self.arm_started_ns >= self.limits.maximum_session_ns):
+                self.request_land('MAXIMUM_SESSION_EXPIRED')
+            elif not self.telemetry_ok(mono_ns) or self.flight_state != 'HOVER_CONFIRMED':
                 self.request_land('TELEMETRY_OR_LIFECYCLE_FAULT')
             elif (self.operator_receipt_ns is None or not
                   0 <= mono_ns - self.operator_receipt_ns < self.limits.operator_timeout_ns):
@@ -237,7 +254,11 @@ class Authority:
         if active:
             self.loss_start_ns = None
             self.reason = 'TRACKING'
-            return ('rc', (sdk_integer(c.lateral), 0, sdk_integer(c.vertical), 0))
+            lateral = max(-self.limits.maximum_lateral_command,
+                          min(self.limits.maximum_lateral_command, sdk_integer(c.lateral)))
+            vertical = max(-self.limits.maximum_vertical_command,
+                           min(self.limits.maximum_vertical_command, sdk_integer(c.vertical)))
+            return ('rc', (lateral, 0, vertical, 0))
         if self.armed:
             self.reason = ('ARMED_WAITING_FOR_NEW_DECISION' if self.awaiting_enabled
                            else 'NEUTRAL_INPUT_EXPIRED_OR_INVALID')
@@ -256,7 +277,15 @@ class Authority:
         return ('rc', (0, 0, 0, 0)) if self.armed or self.landing_latched else ('yield', None)
 
     def status(self):
+        delivery = 'NOT_REQUESTED'
+        if self.landing_latched:
+            delivery = ('LINK_UNAVAILABLE' if not self.connected else
+                        'ATTEMPTS_EXHAUSTED_UNCONFIRMED' if
+                        self.land_attempts >= self.limits.maximum_land_attempts else
+                        'REQUEST_PENDING_UNCONFIRMED')
         return {'connected': self.connected, 'armed': self.armed,
                 'awaiting_enabled': self.awaiting_enabled,
                 'flight_state': self.flight_state, 'landing_latched': self.landing_latched,
-                'reason': self.reason, 'land_attempts': self.land_attempts}
+                'reason': self.reason, 'land_attempts': self.land_attempts,
+                'landing_delivery': delivery, 'arm_started_ns': self.arm_started_ns,
+                'limits': vars(self.limits)}

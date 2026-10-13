@@ -16,7 +16,7 @@ from rclpy.signals import SignalHandlerOptions
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
 from tello_bridge.arbiter import Arbiter
-from tello_bridge.policy import Command, Telemetry
+from tello_bridge.policy import Authority, Command, Limits, Telemetry
 from tello_bridge.timing import source_hash, TimingTrace
 from tello_bridge.transport import FakeTransport, OwnerLock
 
@@ -50,6 +50,9 @@ class Bridge(Node):
             'timing_trace_label', '', ParameterDescriptor(read_only=True)).value
         trace_capacity = self.declare_parameter(
             'timing_trace_capacity', 20000, ParameterDescriptor(read_only=True)).value
+        limits = Limits(**{name: self.declare_parameter(
+            name, default, ParameterDescriptor(read_only=True)).value
+            for name, default in vars(Limits()).items()})
         self.owner = OwnerLock('fake:' + self.get_namespace())
         self.owner.acquire()
         try:
@@ -58,9 +61,10 @@ class Bridge(Node):
                     trace_path, fake=True, capacity=trace_capacity,
                     metadata={'role': 'bridge', 'namespace': self.get_namespace(),
                               'label': trace_label, 'node_sha256': source_hash(__file__),
-                              'operator_timeout_ns': 300000000,
+                              'limits': vars(limits),
+                              'operator_timeout_ns': limits.operator_timeout_ns,
                               'freshness_ns': 250000000, 'tick_period_ns': 20000000})
-            self.arbiter = Arbiter(FakeTransport())
+            self.arbiter = Arbiter(FakeTransport(), Authority(limits))
             self.arbiter.trace = self.trace
             self.arbiter.start()
             self.publisher = self.create_publisher(String, '~/state', 1)

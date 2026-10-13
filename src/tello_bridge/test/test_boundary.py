@@ -331,7 +331,10 @@ def test_telemetry_units_and_missing_fields(packet, expected):
 
 def test_limits_reject_malformed_configuration():
     for changes in ({'maximum_height_cm': 0}, {'minimum_battery_percent': 101},
-                    {'operator_timeout_ns': 0}, {'maximum_land_attempts': 1.5}):
+                    {'operator_timeout_ns': 0}, {'maximum_land_attempts': 1.5},
+                    {'maximum_session_ns': 0}, {'maximum_session_ns': 1.5},
+                    {'maximum_lateral_command': 11}, {'maximum_vertical_command': -1},
+                    {'maximum_vertical_command': True}):
         with pytest.raises(ValueError):
             Limits(**changes)
 
@@ -353,3 +356,57 @@ def test_malformed_clock_does_not_poison_subsequent_safe_processing(ros_ns, mono
     assert not guard.clock_ok(ros_ns, mono_ns)
     assert guard.landing_latched
     assert guard.action(EPOCH + 1, 1)[0] == 'land'
+
+
+def test_session_deadline_with_fresh_tracking_and_operator_cannot_be_renewed():
+    guard = prepared()
+    guard.limits = Limits(maximum_session_ns=200_000_000)
+    for ns in (1, 100_000_000, 199_999_999):
+        guard.telemetry = Telemetry(ns, 80, 70)
+        assert guard.heartbeat(ns)
+        assert moving(guard, ns)
+        assert guard.action(EPOCH + ns, ns)[1] == (5, 0, -4, 0)
+        assert not guard.arm(EPOCH + ns, ns)
+        assert guard.arm_started_ns == 0
+    ns = 200_000_000
+    guard.telemetry = Telemetry(ns, 80, 70)
+    assert guard.heartbeat(ns)
+    assert moving(guard, ns)
+    assert guard.action(EPOCH + ns, ns)[0] == 'land'
+    assert guard.reason == 'MAXIMUM_SESSION_EXPIRED'
+    assert not guard.heartbeat(ns + 1)
+    assert not guard.arm(EPOCH + ns + 1, ns + 1)
+    guard.disarm('MANUAL_TAKEOVER')
+    assert guard.landing_latched
+
+
+@pytest.mark.parametrize('lateral,vertical,expected', [(10, -10, (2, 0, -3, 0)),
+                                                       (-10, 10, (-2, 0, 3, 0))])
+def test_configured_boundary_axis_caps(lateral, vertical, expected):
+    guard = prepared()
+    guard.limits = Limits(maximum_lateral_command=2, maximum_vertical_command=3)
+    assert moving(guard, lateral=lateral, vertical=vertical)
+    assert guard.action(EPOCH + 1, 1)[1] == expected
+    guard.limits = Limits(maximum_vertical_command=0)
+    assert guard.action(EPOCH + 1, 1)[1][2] == 0
+    assert not moving(guard, 2, lateral=10.1)
+    assert guard.action(EPOCH + 2, 2)[1] == (0, 0, 0, 0)
+
+
+@pytest.mark.parametrize('receipt', [None, '0', True, -1, float('nan'), 2])
+def test_invalid_or_future_telemetry_receipt_latches_land(receipt):
+    guard = prepared()
+    guard.telemetry = Telemetry(receipt, 80, 70)
+    assert guard.action(EPOCH + 1, 1)[0] == 'land'
+    assert guard.reason == 'TELEMETRY_OR_LIFECYCLE_FAULT'
+
+
+def test_landing_failure_is_visible_and_never_becomes_confirmation():
+    guard = prepared()
+    guard.request_land()
+    for ns in (0, 1_000_000_000, 2_000_000_000):
+        assert guard.action(EPOCH + ns, ns)[0] == 'land'
+    assert guard.status()['landing_delivery'] == 'ATTEMPTS_EXHAUSTED_UNCONFIRMED'
+    guard.link(False)
+    assert guard.status()['landing_delivery'] == 'LINK_UNAVAILABLE'
+    assert guard.landing_latched

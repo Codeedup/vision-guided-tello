@@ -1,4 +1,5 @@
 #include <memory>
+#include <stdexcept>
 
 #include "rclcpp/rclcpp.hpp"
 #include "drone_interfaces/msg/hand_target.hpp"
@@ -14,6 +15,15 @@ public:
   TrackingControllerNode()
   : Node("tracking_controller")
   {
+    rcl_interfaces::msg::ParameterDescriptor descriptor;
+    descriptor.read_only = true;
+    config_.gain = declare_parameter("gain", 20.0, descriptor);
+    config_.dead_zone = declare_parameter("dead_zone", 0.08, descriptor);
+    config_.lateral_limit = declare_parameter("lateral_limit", 10.0, descriptor);
+    config_.vertical_limit = declare_parameter("vertical_limit", 10.0, descriptor);
+    if (!config_.valid()) {
+      throw std::invalid_argument("Invalid controller configuration or development cap exceeded");
+    }
     publisher_ =
       create_publisher<drone_interfaces::msg::CandidateCommand>(
             "candidate_command",
@@ -37,6 +47,7 @@ public:
   }
 
 private:
+  tracking_controller::ControllerConfig config_;
   drone_interfaces::msg::CandidateCommand last_candidate_;
 
   std::chrono::steady_clock::time_point last_received_at_{};
@@ -121,7 +132,8 @@ private:
     if (target_valid) {
       command = tracking_controller::calculate_command(
             target.error_x,
-            target.error_y);
+            target.error_y,
+            config_);
     }
 
     drone_interfaces::msg::CandidateCommand output;

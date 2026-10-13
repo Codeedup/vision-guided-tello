@@ -239,3 +239,40 @@ TEST(TargetSafety, NonFiniteClockAgesCauseExpiry)
     EXPECT_TRUE(
         tracking_controller::target_expired(0.1, infinity));
 }
+
+TEST(Controller, ConservativeConfigurationAndIndependentAxisIsolation)
+{
+  tracking_controller::ControllerConfig config;
+  config.gain = 10.0;
+  config.lateral_limit = 3.0;
+  config.vertical_limit = 0.0;
+  auto command = tracking_controller::calculate_command(0.5, -0.5, config);
+  EXPECT_DOUBLE_EQ(command.lateral, 3.0);
+  EXPECT_DOUBLE_EQ(command.vertical, 0.0);
+  config.lateral_limit = 0.0;
+  config.vertical_limit = 2.0;
+  command = tracking_controller::calculate_command(-0.5, 0.5, config);
+  EXPECT_DOUBLE_EQ(command.lateral, 0.0);
+  EXPECT_DOUBLE_EQ(command.vertical, -2.0);
+  command = tracking_controller::calculate_command(0.0, 0.0, config);
+  EXPECT_DOUBLE_EQ(command.lateral, 0.0);
+  EXPECT_DOUBLE_EQ(command.vertical, 0.0);
+}
+
+TEST(Controller, InvalidConfigurationCannotAuthorizeMotion)
+{
+  tracking_controller::ControllerConfig config;
+  config.lateral_limit = 10.1;
+  EXPECT_FALSE(config.valid());
+  const auto command = tracking_controller::calculate_command(0.5, -0.5, config);
+  EXPECT_DOUBLE_EQ(command.lateral, 0.0);
+  EXPECT_DOUBLE_EQ(command.vertical, 0.0);
+  config.lateral_limit = 1.0;
+  config.gain = std::numeric_limits<double>::quiet_NaN();
+  EXPECT_FALSE(config.valid());
+  config.gain = 21.0;
+  EXPECT_FALSE(config.valid());
+  config.gain = 20.0;
+  config.dead_zone = 1.0;
+  EXPECT_FALSE(config.valid());
+}
