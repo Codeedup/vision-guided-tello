@@ -115,17 +115,23 @@ def analyze(monitor, bridge=None, operator=None, sender=None, clock=None):
     if delay is None or not 1.45 <= delay <= 2.0:
         errors.append('No observed landing request near 1.5 seconds after loss')
     # Monitor tolerance concerns subscriber scheduling, not production deadlines.
+    # Associate absence with loss using the existing 250 ms observer-gap
+    # budget. This is subscriber tolerance, not a production watchdog change.
+    association_tolerance_s = 0.25
     absent_start = returned = None
     for record in hands:
-        if loss is None or record['elapsed_s'] < loss - 0.75:
-            continue
+        if loss is None:
+            break
+        elapsed = record['elapsed_s']
         if record['flags'] == [False, 0]:
             if absent_start is None:
-                absent_start = record['elapsed_s']
+                absent_start = elapsed
         elif absent_start is not None:
             if (record['flags'] == [True, 1] and
-                    record['elapsed_s'] - absent_start >= 3):
-                returned = record['elapsed_s']
+                    abs(absent_start - loss) <= association_tolerance_s and
+                    elapsed - absent_start >= 3 and
+                    landing is not None and absent_start <= landing <= elapsed):
+                returned = elapsed
                 break
             absent_start = None
     if returned is None:

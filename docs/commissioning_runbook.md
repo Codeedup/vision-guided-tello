@@ -12,17 +12,23 @@ folder and rediscover the reachable IP. Do not reuse an old WSL address.
 
 ```bash
 cd ~/vision_guided_tello_ws
-source /opt/ros/jazzy/setup.bash
-source install/local_setup.bash
 git status --short
 git rev-parse HEAD
-hostname -I
-run="$(date -u +%Y%m%dT%H%M%SZ)-$(git rev-parse --short HEAD)"
-evidence="$PWD/artifacts/$run"
-mkdir -m 700 "$evidence"
-export TELLO_REVISION="$(git rev-parse HEAD)"
-printf 'Run ID: %s\nEvidence: %s\nRevision: %s\n' "$run" "$evidence" "$TELLO_REVISION"
+
+tools/run_offline_checks.sh && {
+    source /opt/ros/jazzy/setup.bash
+    source install/local_setup.bash
+    hostname -I
+    run="$(date -u +%Y%m%dT%H%M%SZ)-$(git rev-parse --short HEAD)"
+    evidence="$PWD/artifacts/$run"
+    mkdir -m 700 "$evidence"
+    export TELLO_REVISION="$(git rev-parse HEAD)"
+    printf 'Run ID: %s\nEvidence: %s\nRevision: %s\n' \
+        "$run" "$evidence" "$TELLO_REVISION"
+}
 ```
+
+> Continue only if the build and tests succeed. The guarded setup block does not run after failure. In every other WSL terminal, source ROS and this workspace’s rebuilt installation before launching nodes. Do not change the checkout during a recorded trial.
 
 Require a clean tracked tree and passing CI for that revision. Copy the printed
 run ID and revision into the other terminals. In every WSL terminal source ROS

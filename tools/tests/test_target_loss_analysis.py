@@ -85,3 +85,73 @@ def test_invalid_json_reports_failure_and_preserves_existing_output(tmp_path):
     with pytest.raises(FileExistsError):
         main(['--monitor', str(path), '--output', str(path)])
     assert path.read_text() == 'original'
+
+
+def test_hand_removal_after_landing_must_fail():
+    reports = fixture()
+    records = reports['monitor']['message_records']
+
+    # Extend the recording so five seconds of returned hand are visible.
+    templates = deepcopy(records[-2:])
+    for tick in range(151, 201):
+        for template in templates:
+            record = deepcopy(template)
+            record['elapsed_s'] = tick / 10
+            if record['topic'] == 'approved_command':
+                stamp = (
+                    reports['sender']['frames'][0]['capture_time_ns']
+                    + tick * 100_000_000
+                )
+                record['source_stamp_ns'] = stamp
+                record['decision_stamp_ns'] = stamp + 1
+            records.append(record)
+
+    # Tracking still stops at 6.2 s and landing starts at 7.7 s.
+    # Move hand removal to 9.0 s, with return at 12.1 s.
+    for record in records:
+        if record['topic'] == 'hand_target':
+            absent = 9.0 <= record['elapsed_s'] < 12.1
+            record['flags'] = [False, 0] if absent else [True, 1]
+
+    result = analyze(**reports)
+
+    assert not result['passed'], (
+        'Analyzer accepted hand removal after landing: '
+        + str(result)
+    )
+
+
+@pytest.mark.parametrize(
+    'offset_s, expected',
+    [
+        (-0.250001, False),
+        (-0.25, True),
+        (-0.20, True),
+        (0.0, True),
+        (0.20, True),
+        (0.25, True),
+        (0.250001, False),
+    ],
+)
+def test_removal_loss_observation_tolerance(offset_s, expected):
+    reports = fixture()
+    for record in reports['monitor']['message_records']:
+        # Shift hand receipt times relative to approved-command receipt times.
+        record['elapsed_s'] += 1.0
+        if record['topic'] == 'hand_target':
+            record['elapsed_s'] += offset_s
+
+    result = analyze(**reports)
+
+    assert result['passed'] is expected, result
+
+
+def test_interrupted_hand_absence_must_fail():
+    reports = fixture()
+    for record in reports['monitor']['message_records']:
+        if record['topic'] == 'hand_target' and record['elapsed_s'] == 8.0:
+            record['flags'] = [True, 1]
+
+    result = analyze(**reports)
+
+    assert not result['passed'], result
