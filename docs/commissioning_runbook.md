@@ -71,12 +71,16 @@ rediscover the IP and redo the clock check after changing networks if necessary.
 cd ~/vision_guided_tello_ws
 run='RUN_ID'
 TELLO_BIND=0.0.0.0 tools/start_webcam_pipeline.sh --namespace /webcam_test \
-  --bridge-trace "$PWD/artifacts/$run/bridge.json" --trace-label "$run"
+  --bridge-trace "$PWD/artifacts/$run/bridge.json" \
+  --provenance-output "$PWD/artifacts/$run/runtime_provenance.json" \
+  --trace-label "$run"
 ```
 
 Wait for `READY`. Stop on duplicate ownership, busy UDP port, missing/duplicate
 publishers, non-real clocks, enabled/nonneutral startup output or startup failure.
 Do not bypass the readiness check. Keep terminal A running throughout the trial.
+Require `runtime_provenance.json` to report `passed: true`; it records the live
+ROS child PIDs, installed paths, hashes and package prefixes from this checkout.
 
 **Windows terminal B:** start the bounded headless camera sender (the variables
 from setup must still be present).

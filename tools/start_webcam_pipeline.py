@@ -13,6 +13,8 @@ import sys
 import tempfile
 import time
 
+from runtime_provenance import capture, write_new
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -149,6 +151,8 @@ def main():
                         default=int(os.environ.get('TELLO_OBSERVATION_PORT', '5005')))
     parser.add_argument('--bridge-trace', default='', help='New FAKE server timing report')
     parser.add_argument('--trace-label', default='')
+    parser.add_argument('--provenance-output', default='',
+                        help='New JSON record of running ROS process paths and hashes')
     args = parser.parse_args()
     if not 1 <= args.port <= 65535:
         parser.error('Observation UDP port must be 1..65535 (port 0 is not reproducible)')
@@ -162,6 +166,12 @@ def main():
             parser.error('Trace path already exists; choose a new filename')
         if not Path(args.bridge_trace).parent.is_dir():
             parser.error('Trace parent directory does not exist')
+    if args.provenance_output:
+        args.provenance_output = str(Path(args.provenance_output).expanduser().absolute())
+        if os.path.lexists(args.provenance_output):
+            parser.error('Provenance path already exists; choose a new filename')
+        if not Path(args.provenance_output).parent.is_dir():
+            parser.error('Provenance parent directory does not exist')
 
     stopping = False
     launch = None
@@ -194,6 +204,13 @@ def main():
             raise RuntimeError('Readiness failed or interrupted; stopping owned pipeline')
         if launch.poll() is not None or stopping:
             raise RuntimeError('Launch exited or stop requested before readiness')
+        if args.provenance_output:
+            provenance = capture(launch.pid, ROOT)
+            write_new(args.provenance_output, provenance)
+            if not provenance['passed']:
+                raise RuntimeError('Runtime provenance failed: ' +
+                                   '; '.join(provenance['errors']))
+            print('Runtime provenance verified: ' + args.provenance_output, flush=True)
         print('READY: one publisher per topic, required nodes reachable, clocks real, '
               'approved output disabled/zero, bridge FAKE/unarmed. '
               'This is software readiness, not flight clearance. '

@@ -19,6 +19,7 @@ def fixture():
         stamp = epoch + tick * 100_000_000
         records.extend([
             {'topic': 'hand_target', 'elapsed_s': elapsed,
+             'source_stamp_ns': stamp,
              'flags': [False, 0] if absent else [True, 1]},
             {'topic': 'approved_command', 'elapsed_s': elapsed,
              'source_stamp_ns': stamp, 'decision_stamp_ns': stamp + 1,
@@ -155,3 +156,89 @@ def test_interrupted_hand_absence_must_fail():
     result = analyze(**reports)
 
     assert not result['passed'], result
+
+
+@pytest.mark.parametrize('offset_ns, expected', [
+    (-250_000_000, False), (-249_999_999, True), (0, True), (1, False),
+])
+def test_no_hand_without_prior_removal_must_precede_loss(offset_ns, expected):
+    reports = fixture()
+    records = reports['monitor']['message_records']
+    loss_decision = next(r['decision_stamp_ns'] for r in records
+                         if r['topic'] == 'approved_command' and r['elapsed_s'] == 6.2)
+    first_absence = next(r for r in records
+                         if r['topic'] == 'hand_target' and r['flags'] == [False, 0])
+    first_absence['source_stamp_ns'] = loss_decision + offset_ns
+
+    result = analyze(**reports)
+
+    assert result['passed'] is expected, result
+
+
+@pytest.mark.parametrize('age_ns, expected', [
+    (249_999_999, True), (250_000_000, False),
+])
+def test_tracking_freshness_boundary(age_ns, expected):
+    reports = fixture()
+    tracking = next(r for r in reports['monitor']['message_records']
+                    if r['topic'] == 'approved_command' and r['flags'] == [True, True, False])
+    tracking['source_stamp_ns'] = tracking['decision_stamp_ns'] - age_ns
+
+    result = analyze(**reports)
+
+    assert result['passed'] is expected, result
+
+
+def test_partial_hand_removal_before_loss_can_precede_no_hand():
+    reports = fixture()
+    records = reports['monitor']['message_records']
+    loss_decision = next(r['decision_stamp_ns'] for r in records
+                         if r['topic'] == 'approved_command' and r['elapsed_s'] == 6.2)
+    first_absence = next(i for i, r in enumerate(records)
+                         if r['topic'] == 'hand_target' and r['flags'] == [False, 0])
+    records.insert(first_absence, {
+        'topic': 'hand_target', 'elapsed_s': 6.19,
+        'source_stamp_ns': loss_decision - 1_000_000,
+        'flags': [False, 1],
+    })
+    records[first_absence + 1]['source_stamp_ns'] = loss_decision + 500_000
+
+    assert analyze(**reports)['passed']
+
+    records[first_absence]['flags'] = [False, 2]
+    assert not analyze(**reports)['passed']
+
+
+def test_brief_return_reacquisition_flicker_then_five_seconds_passes():
+    reports = fixture()
+    for record in reports['monitor']['message_records']:
+        if record['topic'] == 'hand_target' and record['elapsed_s'] == 9.6:
+            record['flags'] = [False, 1]
+
+    result = analyze(**reports)
+
+    assert result['passed'], result
+    assert result['hand_return_elapsed_s'] == pytest.approx(9.7)
+
+
+def test_bridge_input_loss_watchdog_is_valid_but_unrelated_fault_is_not():
+    reports = fixture()
+    loss_decision = next(r['decision_stamp_ns']
+                         for r in reports['monitor']['message_records']
+                         if r['topic'] == 'approved_command' and r['elapsed_s'] == 6.2)
+    reports['bridge']['metadata'].update(wall_time_ns=loss_decision,
+                                         mono_anchor_ns=0)
+    reports['bridge']['first_fault'] = {
+        'kind': 'policy_tick',
+        'start_ns': 1_500_000_000,
+        'before': {'reason': 'NEUTRAL_INPUT_EXPIRED_OR_INVALID'},
+        'after': {'reason': 'APPROVED_INPUT_LOSS'},
+    }
+    assert analyze(**reports)['passed']
+
+    reports['bridge']['first_fault']['start_ns'] = 500_000_000
+    assert not analyze(**reports)['passed']
+
+    reports['bridge']['first_fault']['start_ns'] = 1_500_000_000
+    reports['bridge']['first_fault']['after']['reason'] = 'SESSION_DEADLINE'
+    assert not analyze(**reports)['passed']

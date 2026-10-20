@@ -2,6 +2,7 @@
 """Conservative FAKE target-loss evidence audit; never infer physical outcomes."""
 
 import argparse
+import hashlib
 import json
 import math
 from pathlib import Path
@@ -43,8 +44,13 @@ def analyze(monitor, bridge=None, operator=None, sender=None, clock=None):
         if not any(e.get('after', {}).get('reason') == 'TRACKING' for e in events):
             errors.append('Bridge never evidenced actual FAKE tracking authority')
         fault = bridge.get('first_fault') or {}
-        if fault.get('after', {}).get('reason') != 'SUPERVISOR_LAND':
-            errors.append('Bridge first landing cause was not the supervisor loss request')
+        cause = fault.get('after', {}).get('reason')
+        watchdog_loss = (cause == 'APPROVED_INPUT_LOSS' and
+                         fault.get('kind') == 'policy_tick' and
+                         fault.get('before', {}).get('reason') ==
+                         'NEUTRAL_INPUT_EXPIRED_OR_INVALID')
+        if cause != 'SUPERVISOR_LAND' and not watchdog_loss:
+            errors.append('Bridge first landing cause was not target/input loss')
         if any(e.get('before', {}).get('landing_latched') and
                e.get('after', {}).get('landing_latched') is False for e in events):
             errors.append('Bridge landing latch was cleared during the run')
@@ -107,6 +113,7 @@ def analyze(monitor, bridge=None, operator=None, sender=None, clock=None):
             start = None
     maximum_track = max((end - begin for begin, end in intervals), default=0)
     loss = next((end for begin, end in intervals if end - begin >= 5), None)
+    loss_record = next((r for r in approved if r['elapsed_s'] == loss), None)
     landing = next((r['elapsed_s'] for r in approved if r['flags'] == [True, False, True]
                     and loss is not None and r['elapsed_s'] >= loss), None)
     if loss is None:
@@ -114,26 +121,70 @@ def analyze(monitor, bridge=None, operator=None, sender=None, clock=None):
     delay = None if landing is None else landing - loss
     if delay is None or not 1.45 <= delay <= 2.0:
         errors.append('No observed landing request near 1.5 seconds after loss')
+    if bridge is not None and (bridge.get('first_fault') or {}).get('after', {}).get(
+            'reason') == 'APPROVED_INPUT_LOSS':
+        info, fault = bridge.get('metadata', {}), bridge['first_fault']
+        wall, anchor, start_ns = (info.get('wall_time_ns'),
+                                  info.get('mono_anchor_ns'), fault.get('start_ns'))
+        loss_decision = None if loss_record is None else loss_record.get('decision_stamp_ns')
+        if (not all(type(v) is int for v in (wall, anchor, start_ns, loss_decision)) or
+                not 1.45 <= (wall + start_ns - anchor - loss_decision) / 1e9 <= 2.0):
+            errors.append('Bridge input-loss watchdog timing not paired to loss')
     # Monitor tolerance concerns subscriber scheduling, not production deadlines.
     # Associate absence with loss using the existing 250 ms observer-gap
     # budget. This is subscriber tolerance, not a production watchdog change.
     association_tolerance_s = 0.25
-    absent_start = returned = None
-    for record in hands:
-        if loss is None:
-            break
-        elapsed = record['elapsed_s']
-        if record['flags'] == [False, 0]:
-            if absent_start is None:
-                absent_start = elapsed
-        elif absent_start is not None:
-            if (record['flags'] == [True, 1] and
-                    abs(absent_start - loss) <= association_tolerance_s and
-                    elapsed - absent_start >= 3 and
-                    landing is not None and absent_start <= landing <= elapsed):
-                returned = elapsed
+    returned = None
+    loss_decision = None if loss_record is None else loss_record.get('decision_stamp_ns')
+    for index, record in enumerate(hands):
+        if (loss is None or record['flags'] != [False, 0] or
+                (index and hands[index - 1]['flags'] == [False, 0]) or
+                abs(record['elapsed_s'] - loss) > association_tolerance_s):
+            continue
+        # A hand may first become ineligible as it leaves the frame, before the
+        # detector reports zero hands. Require that one-hand transition to have
+        # preceded the loss decision; multiple hands are not removal evidence.
+        trigger = record
+        trigger_index = index
+        if (type(loss_decision) is int and type(record.get('source_stamp_ns')) is int
+                and record['source_stamp_ns'] > loss_decision and index):
+            trigger = hands[index - 1]
+            trigger_index = index - 1
+        previous = None if trigger_index == 0 else hands[trigger_index - 1]
+        source = trigger.get('source_stamp_ns')
+        no_hand_source = record.get('source_stamp_ns')
+        if (previous is None or previous['flags'] != [True, 1] or
+                trigger['elapsed_s'] - previous['elapsed_s'] > association_tolerance_s or
+                trigger['flags'] not in ([False, 0], [False, 1]) or
+                type(source) is not int or type(loss_decision) is not int or
+                type(no_hand_source) is not int or
+                not 0 <= loss_decision - source < 250_000_000 or
+                not 0 <= no_hand_source - source < 250_000_000 or
+                record['elapsed_s'] - trigger['elapsed_s'] > association_tolerance_s):
+            continue
+        following = next((i for i in range(index + 1, len(hands))
+                          if hands[i]['flags'] != [False, 0]), None)
+        if following is None or hands[following]['flags'] != [True, 1]:
+            continue
+        first_return = hands[following]['elapsed_s']
+        if (first_return - record['elapsed_s'] < 3 or landing is None or
+                not record['elapsed_s'] <= landing <= first_return):
+            continue
+        # Allow brief hand-shape flicker during reacquisition. The counted
+        # return still needs five uninterrupted seconds of eligible samples.
+        stable_start = None
+        for hand in hands[following:]:
+            if hand['flags'] != [True, 1]:
+                stable_start = None
+            elif stable_start is None:
+                stable_start = hand['elapsed_s']
+            if (stable_start is not None and
+                    stable_start - first_return <= 1.0 and
+                    hand['elapsed_s'] - stable_start >= 5):
+                returned = stable_start
                 break
-            absent_start = None
+        if returned is not None:
+            break
     if returned is None:
         errors.append('No 3-second hand absence followed by eligible hand return')
     else:
@@ -144,7 +195,8 @@ def analyze(monitor, bridge=None, operator=None, sender=None, clock=None):
                 or any(r['flags'] != [True, False, True] for r in tail)
                 or any(r['flags'] != [True, 1] for r in returned_hands)):
             errors.append('Landing latch/no restart not evidenced for 5 seconds of hand return')
-    return {'schema': 'fake_target_loss_audit', 'passed': not errors, 'errors': errors,
+    return {'schema': 'fake_target_loss_audit', 'audit_policy': 'removal_transition_v2',
+            'passed': not errors, 'errors': errors,
             'run_id': label, 'revision': revision,
             'maximum_completed_track_s': maximum_track, 'loss_elapsed_s': loss,
             'landing_elapsed_s': landing, 'observed_loss_to_land_s': delay,
@@ -168,6 +220,7 @@ def main(argv=None):
         result = analyze(**reports)
     except (OSError, ValueError, KeyError, TypeError, AttributeError) as error:
         result = {'passed': False, 'errors': ['Unreadable/malformed evidence: ' + str(error)]}
+    result['analyzer_sha256'] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
     if args.output:
         with args.output.open('x', encoding='utf-8') as stream:
             json.dump(result, stream, indent=2, allow_nan=False)
