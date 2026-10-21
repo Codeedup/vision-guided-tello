@@ -23,13 +23,17 @@ In a second Windows PowerShell terminal, send synthetic decisions:
 & $python "$repo\tools\tello_diagnostics\exercise_fake_gateway.py" --receiver 127.0.0.1 --port 5010
 ```
 
-During the ten-second `disabled` phase, click **Prepare FAKE hover** then
-**Arm FAKE session**. During `tracking`, focus the gateway window and press
-**Space**. The window must immediately show `ABORT LATCHED` and
+The sender keeps publishing disabled decisions while you click **Prepare FAKE
+hover** and **Arm FAKE session**. It detects that local FAKE arm and begins
+tracking decisions immediately, before the 1.5-second input-loss watchdog.
+Keep the gateway window focused. Wait for `FAKE ARMED` and the sender's
+`sending tracking decisions` message, then press **Space** while tracking is
+still active. The window must immediately show `ABORT LATCHED` and
 `landing requested/unconfirmed`. Close it to save the trace. Inspect the
 transport events: a non-neutral `rc` before Space, then `rc 0 0 0 0`, then
 `land`, with no later non-neutral `rc`. Repeat with the sender stopped, and
 repeat while its tracking packets continue. The gateway must remain aborted.
+Closing the window or pressing Ctrl+C saves the trace without a traceback.
 
 Space is listened for **only in the focused gateway window**; it is not a
 system-wide hotkey. Losing window focus while armed also aborts. Closing the

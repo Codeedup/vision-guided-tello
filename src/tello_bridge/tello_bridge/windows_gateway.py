@@ -3,7 +3,9 @@
 import argparse
 from collections import deque
 import json
+from pathlib import Path
 import socket
+import tempfile
 import time
 
 from tello_bridge.arbiter import Arbiter
@@ -41,6 +43,11 @@ def decode_packet(data):
     return Command(item['decision_ns'], item['source_ns'], item['enabled'],
                    item['tracking'], item['land'],
                    item['lateral'], item['vertical'])
+
+
+def fake_arm_marker(port):
+    """Return a local FAKE exercise signal path for one gateway port."""
+    return Path(tempfile.gettempdir()) / f'tello-fake-gateway-{port}.armed'
 
 
 class FakeGateway:
@@ -179,6 +186,8 @@ def main(argv=None):
     owner = OwnerLock(
         'fake-windows-gateway:' + args.bind + ':' + str(args.port))
     owner.acquire()
+    marker = fake_arm_marker(args.port)
+    marker.unlink(missing_ok=True)
     sock = None
     gateway = None
     try:
@@ -191,11 +200,16 @@ def main(argv=None):
         status = tk.StringVar(
             value='FAKE DISABLED — focus this window for Space')
         tk.Label(root, textvariable=status, width=72, pady=18).pack()
+
+        def arm_fake():
+            if gateway.arm_fake():
+                marker.write_text('FAKE armed\n', encoding='utf-8')
+
         buttons = (
             tk.Button(root, text='Prepare FAKE hover',
                       command=gateway.prepare_fake_hover),
             tk.Button(root, text='Arm FAKE session',
-                      command=gateway.arm_fake),
+                      command=arm_fake),
             tk.Button(root, text='Explicit FAKE reset',
                       command=gateway.reset_fake),
         )
@@ -242,8 +256,12 @@ def main(argv=None):
         root.protocol('WM_DELETE_WINDOW', close)
         root.after(20, loop)
         root.focus_force()
-        root.mainloop()
+        try:
+            root.mainloop()
+        except KeyboardInterrupt:
+            gateway.log('operator_interrupt')
     finally:
+        marker.unlink(missing_ok=True)
         if gateway:
             gateway.close()
             with open(args.trace, 'x', encoding='utf-8') as output:

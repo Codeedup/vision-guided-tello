@@ -1,9 +1,10 @@
 """Offline Windows gateway behavior at the final FAKE transport boundary."""
 
 import json
+import sys
 import time
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -207,3 +208,24 @@ def test_forwarder_preserves_stamps_and_has_no_side_effects():
     assert decoded.source_ns == EPOCH + 2
     with pytest.raises(SystemExit):
         main([])
+
+
+def test_gateway_keyboard_interrupt_closes_and_saves_trace(tmp_path):
+    """Ctrl+C during Tk mainloop exits cleanly and retains FAKE evidence."""
+    root = Mock()
+    root.mainloop.side_effect = KeyboardInterrupt
+    tkinter = SimpleNamespace(Tk=lambda: root, StringVar=Mock(),
+                              Label=Mock(return_value=Mock()),
+                              Button=Mock(return_value=Mock()))
+    trace = tmp_path / 'trace.json'
+    marker = tmp_path / 'armed'
+    with patch.dict(sys.modules, {'tkinter': tkinter}), \
+            patch('tello_bridge.windows_gateway.socket.socket'), \
+            patch('tello_bridge.windows_gateway.OwnerLock'), \
+            patch('tello_bridge.windows_gateway.fake_arm_marker',
+                  return_value=marker):
+        main(['--bind', '127.0.0.1', '--port', '5010', '--trace', str(trace)])
+    result = json.loads(trace.read_text())
+    assert result['fake'] is True
+    assert result['events'][-1]['event'] == 'operator_interrupt'
+    assert not marker.exists()
