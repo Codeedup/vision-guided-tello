@@ -3,7 +3,7 @@ project(tello_bridge)
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 ament_python_install_package(${PROJECT_NAME})
-install(PROGRAMS scripts/tello_bridge_node scripts/tello_operator
+install(PROGRAMS scripts/tello_bridge_node scripts/tello_operator scripts/tello_approved_forwarder
   DESTINATION lib/${PROJECT_NAME})
 set(WEBCAM_TOOLS ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/webcam_perception)
 install(PROGRAMS ${WEBCAM_TOOLS}/ros_hand_receiver.py ${WEBCAM_TOOLS}/measure_pipeline.py
@@ -26,6 +26,8 @@ if(BUILD_TESTING)
   ament_add_pytest_test(boundary_tests test/test_boundary.py
     APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR})
   ament_add_pytest_test(timing_tests test/test_timing.py
+    APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR})
+  ament_add_pytest_test(windows_gateway_tests test/test_windows_gateway.py
     APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR})
   ament_add_pytest_test(shutdown_signal_tests test/test_shutdown_signals.py TIMEOUT 45)
   ament_add_pytest_test(webcam_tools_tests ${WEBCAM_TOOLS}

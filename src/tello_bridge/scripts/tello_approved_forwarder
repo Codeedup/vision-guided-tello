@@ -1,0 +1,5 @@
+#!/usr/bin/env python3
+from tello_bridge.forward_approved import main
+
+if __name__ == '__main__':
+    main()

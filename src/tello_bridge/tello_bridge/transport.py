@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import socket
 import tempfile
+import time
 
 from tello_bridge.policy import sdk_integer
 
@@ -77,6 +78,7 @@ class FakeTransport:
         ok = self.connected and not self.fail_next
         self.fail_next = False
         self.record({'attempt': text, 'mono_ns': mono_ns,
+                     'attempt_observed_ns': time.monotonic_ns(),
                      'os_send_result': 'FAKE_SENT' if ok else 'FAKE_ERROR',
                      'acknowledgement': None})
         if not ok:
@@ -144,7 +146,9 @@ class UdpSdkTransport:
             raise
 
     def _send(self, command, mono_ns):
-        event = {'attempt': command, 'mono_ns': mono_ns, 'acknowledgement': None}
+        event = {'attempt': command, 'mono_ns': mono_ns,
+                 'attempt_observed_ns': time.monotonic_ns(),
+                 'acknowledgement': None}
         try:
             if self.socket is None:
                 raise OSError('Transport not explicitly opened')
@@ -174,7 +178,9 @@ class UdpSdkTransport:
                 break
             if peer == self.peer:
                 self.record({'reply': data.decode('ascii', errors='replace'),
-                             'mono_ns': mono_ns, 'acknowledgement': 'UNCORRELATED_SDK_REPLY'})
+                             'mono_ns': mono_ns,
+                             'reply_observed_ns': time.monotonic_ns(),
+                             'acknowledgement': 'UNCORRELATED_SDK_REPLY'})
 
     def close(self):
         if self.socket is not None:

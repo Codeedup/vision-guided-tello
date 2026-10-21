@@ -103,7 +103,7 @@ class Authority:
 
     def link(self, connected):
         self.connected = bool(connected)
-        self.disarm('LINK_CHANGE')
+        self.disarm(self.reason if self.landing_latched else 'LINK_CHANGE')
         self.telemetry = None
         self.flight_state = 'UNKNOWN'
         self.disabled_seen = False
@@ -133,7 +133,9 @@ class Authority:
                      and abs((ros_ns - self.last_ros_ns) -
                              (mono_ns - self.last_mono_ns)) <= 50_000_000)
         if not valid:
-            if self.armed:
+            if self.landing_latched:
+                pass  # Preserve the original landing cause across clock faults.
+            elif self.armed:
                 self.request_land('CLOCK_FAULT')
             else:
                 self.disarm('CLOCK_FAULT')
@@ -161,7 +163,8 @@ class Authority:
             return False
         if (not self.connected or not self.disabled_seen or self.landing_latched
                 or self.flight_state != 'HOVER_CONFIRMED' or not self.telemetry_ok(mono_ns)):
-            self.reason = 'ARM_INTERLOCK'
+            if not self.landing_latched:
+                self.reason = 'ARM_INTERLOCK'
             return False
         self.arm_barrier_ns = ros_ns
         self.arm_started_ns = mono_ns
@@ -185,6 +188,10 @@ class Authority:
         return False
 
     def accept(self, command, ros_ns, mono_ns):
+        if self.landing_latched and self.reason == 'OPERATOR_ABORT':
+            # No upstream packet may change the local operator-abort cause or
+            # create a command backlog while landing owns the transport.
+            return False
         if not self.clock_ok(ros_ns, mono_ns):
             return False
         if not isinstance(command, Command):
@@ -266,15 +273,21 @@ class Authority:
                 self.loss_start_ns = mono_ns
             if mono_ns - self.loss_start_ns >= self.limits.input_loss_land_ns:
                 self.request_land('APPROVED_INPUT_LOSS')
-        if self.connected and self.landing_latched:
-            if (self.land_attempts < self.limits.maximum_land_attempts and
-                    (self.last_land_ns is None or
-                     mono_ns - self.last_land_ns >= self.limits.land_retry_ns)):
-                self.land_attempts += 1
-                self.last_land_ns = mono_ns
-                return ('land', None)
+        if self.next_land_attempt(mono_ns):
+            return ('land', None)
         # Unarmed ownership yields to the operator; never continuously fight RC.
         return ('rc', (0, 0, 0, 0)) if self.armed or self.landing_latched else ('yield', None)
+
+    def next_land_attempt(self, mono_ns):
+        """Reserve one bounded landing attempt using only the local monotonic clock."""
+        if (self.connected and self.landing_latched and
+                self.land_attempts < self.limits.maximum_land_attempts and
+                (self.last_land_ns is None or
+                 mono_ns - self.last_land_ns >= self.limits.land_retry_ns)):
+            self.land_attempts += 1
+            self.last_land_ns = mono_ns
+            return True
+        return False
 
     def status(self):
         delivery = 'NOT_REQUESTED'

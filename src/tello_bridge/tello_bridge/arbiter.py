@@ -50,6 +50,21 @@ class Arbiter:
         self.neutral(mono_ns)
         self.owned_last_tick = False
 
+    def operator_abort(self, mono_ns):
+        """Local, immediate neutral then bounded land; no receive/poll dependency."""
+        if self.authority.reason != 'OPERATOR_ABORT':
+            self.authority.request_land('OPERATOR_ABORT')
+        self.neutral(mono_ns)
+        if not self.authority.connected:
+            return
+        if self.authority.next_land_attempt(mono_ns):
+            try:
+                self.transport_call('send_land', mono_ns)
+            except OSError:
+                self.authority.link(False)
+                self.transport.close()
+        self.owned_last_tick = True
+
     def tick(self, ros_ns, mono_ns):
         try:
             self.transport_call('poll', mono_ns)
@@ -80,8 +95,7 @@ class Arbiter:
         self.neutral(mono_ns)
         if self.authority.connected and self.authority.landing_latched:
             try:
-                if self.authority.land_attempts < self.authority.limits.maximum_land_attempts:
-                    self.authority.land_attempts += 1
+                if self.authority.next_land_attempt(mono_ns):
                     self.transport_call('send_land', mono_ns)
             except OSError:
                 pass
