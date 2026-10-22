@@ -70,6 +70,10 @@ rediscover the IP and redo the clock check after changing networks if necessary.
 
 **WSL terminal A:** set the same ID, then start exactly one pipeline.
 
+The launcher selects Fast DDS UDPv4 for its ROS children. The offline
+supervisor-suspension check uses the same transport so a paused process cannot
+hold a shared-memory port lock across the bridge watchdog.
+
 ```bash
 cd ~/vision_guided_tello_ws
 run='RUN_ID'

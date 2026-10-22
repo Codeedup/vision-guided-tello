@@ -32,6 +32,9 @@ from synthetic_observations import observation  # noqa: E402, I100
 
 @pytest.mark.launch_test
 def generate_test_description():
+    # SIGSTOP on the supervisor may hold a Fast DDS shared-memory port lock and
+    # stall the bridge too. Match the FAKE pipeline launcher's UDPv4 transport.
+    os.environ['FASTDDS_BUILTIN_TRANSPORTS'] = 'UDPv4'
     trace_dir = tempfile.mkdtemp(prefix='tello-loopback-timing-')
     processes = {name: launch_ros.actions.Node(
         package=package, executable=executable, namespace='loopback_boundary',

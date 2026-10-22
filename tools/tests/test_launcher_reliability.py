@@ -191,6 +191,8 @@ class WrapperTests(unittest.TestCase):
                 self.assertIn('namespace:=/webcam_test', launch_call.args[0])
                 self.assertIs(launch_call.kwargs['start_new_session'], True)
                 self.assertEqual(launch_call.kwargs['env']['TELLO_REVISION'], 'revision')
+                self.assertEqual(launch_call.kwargs['env']['FASTDDS_BUILTIN_TRANSPORTS'],
+                                 'UDPv4')
                 self.assertEqual(len(launch_call.kwargs['pass_fds']), 1)
             messages = [str(call.args[0]) for call in output.call_args_list]
             return code, messages, events, popen.call_count

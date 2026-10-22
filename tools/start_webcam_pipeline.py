@@ -193,7 +193,10 @@ def main():
             return 130
         revision = subprocess.run(['git', '-C', str(ROOT), 'rev-parse', 'HEAD'],
                                   capture_output=True, text=True, timeout=5)
-        launch_env = dict(os.environ, TELLO_REVISION=(
+        # A suspended ROS peer can hold a Fast DDS shared-memory port lock and
+        # stall this process's watchdog. Keep the launched FAKE pipeline on
+        # UDPv4, which the process-suspension regression exercises.
+        launch_env = dict(os.environ, FASTDDS_BUILTIN_TRANSPORTS='UDPv4', TELLO_REVISION=(
             revision.stdout.strip() if revision.returncode == 0 else 'UNRECORDED'))
         # The launch process retains the flock if this wrapper is killed.
         launch = subprocess.Popen(build_launch_command(args), start_new_session=True,
