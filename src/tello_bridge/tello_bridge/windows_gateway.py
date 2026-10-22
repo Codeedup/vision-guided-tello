@@ -2,12 +2,12 @@
 
 import argparse
 from collections import deque
+import hashlib
 import json
 from pathlib import Path
 import socket
 import tempfile
 import time
-import hashlib
 
 from tello_bridge.arbiter import Arbiter
 from tello_bridge.policy import Authority, Command, Limits, Telemetry
@@ -174,7 +174,8 @@ class FakeGateway:
 
 
 class RealGateway(FakeGateway):
-    """A deliberately separate real gateway mode.
+    """
+    A deliberately separate real gateway mode.
 
     ``grounded-bench`` never consumes upstream movement and only emits local,
     single-packet axis pulses.  ``flight`` is a fresh-process mode which retains

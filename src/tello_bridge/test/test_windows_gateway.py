@@ -9,11 +9,10 @@ from unittest.mock import Mock, patch
 import pytest
 
 from tello_bridge.forward_approved import encode_approved
-from tello_bridge.policy import FRESH_NS
-from tello_bridge.policy import Telemetry
+from tello_bridge.policy import FRESH_NS, Telemetry
 from tello_bridge.transport import FakeTransport
-from tello_bridge.windows_gateway import (decode_packet, FakeGateway, RealGateway,
-                                          main)
+from tello_bridge.windows_gateway import (decode_packet, FakeGateway, main,
+                                          RealGateway)
 
 EPOCH = 1_800_000_000_000_000_000
 
