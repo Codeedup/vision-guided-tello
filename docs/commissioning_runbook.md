@@ -1,8 +1,8 @@
 # Staged commissioning runbook
 
-Updated 13 October 2026. Run **one stage at a time**. These are prepared user
-commands, not automatic aircraft authorization. The next test is the clean
-enabled FAKE target-loss repeat below; all motion consumers remain fake.
+Updated 22 October 2026. Run **one stage at a time**. These are prepared user
+commands, not automatic aircraft authorization. The enabled FAKE target-loss
+repeat has been reviewed; the next aircraft stage is the grounded SDK bench.
 [Readiness blockers and source defaults](readiness_2026-10-13.md) remain binding.
 
 ## Before the next test — nodes stopped
@@ -184,17 +184,27 @@ run with different processed frames does not isolate GUI overhead. Existing JSON
 contains timings, not replayable pixels; it cannot be converted back into video.
 An appropriate recording still has to be supplied/captured by the user.
 
-## 3. Real boundary bench — blocked until physical route/design is resolved
+## 3. Grounded real-SDK command bench
+
+Use the separate [grounded SDK bench procedure](grounded_sdk_bench.md). Its
+Windows process is the single real SDK owner and has a literal four-command
+allowlist: SDK entry, battery and height queries, and zero RC. The ROS bridge
+and the Space-abort gateway remain FAKE-only. Review the saved trace with the
+included auditor before interpreting any SDK result.
 
 **WIFI: connect the laptop to the Tello network.** User-supervised, grounded,
 propellers removed. Current code has **no commissioned flight-capable ROS mode**.
 Do not invent an enable/takeoff command or switch the launcher to hardware.
-Resolve a single command owner (Windows gateway or proven all-WSL deployment),
-telemetry provenance/lifecycle evidence and operator abort path first.
+The first grounded bench does not enable a movement gateway. Resolve
+telemetry provenance/lifecycle evidence and an independent operator abort path
+before any later movement-capable stage.
 
-Prove mode isolation, socket ownership, bounded mapped channels, valid/stale/low
-telemetry behaviour and normal shutdown on the ground. Separate attempted command,
-OS send, correlated response where possible, and observed physical outcome.
+This first bench proves mode isolation, local socket ownership, the harmless
+wire allowlist, neutral output on lost input, reply-loss detection, and normal
+shutdown on the ground. It checks one battery and height query before neutral
+output, then checks periodic battery replies. Bounded movement mapping and the
+full telemetry lifecycle still require a separate guarded command-path test.
+Separate attempted command, OS send, SDK reply, and observed physical outcome.
 Bench wire behaviour cannot establish airborne signs or confirmed landing.
 No current height or SDK `ok` alone can satisfy real hover/landed confirmation.
 

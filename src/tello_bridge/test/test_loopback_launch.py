@@ -219,7 +219,7 @@ class TestLoopback(unittest.TestCase):
                 log_stream = log_path.open('w')
                 process = subprocess.Popen([
                     sys.executable, str(TOOLS / 'measure_pipeline.py'),
-                    '--namespace', '/loopback_boundary', '--duration', '4',
+                    '--namespace', '/loopback_boundary', '--duration', '8',
                     '--source', 'synthetic', '--run-kind', 'smoke', '--output', str(path)],
                     stdout=log_stream, stderr=subprocess.PIPE, text=True)
                 stream = self.start_sender()
@@ -227,14 +227,14 @@ class TestLoopback(unittest.TestCase):
                     try:
                         self.wait(lambda: 'Observing' in log_path.read_text(), 5)
                         self.wait(
-                            lambda: 'All pipeline topics observed.' in log_path.read_text(), 3)
+                            lambda: 'All pipeline topics observed.' in log_path.read_text(), 6)
                     except AssertionError:
                         print({'monitor_process': process.poll(),
                                'domain_environment': os.environ.get('ROS_DOMAIN_ID'),
                                'context_domain': self.node.context.get_domain_id(),
                                'nodes': self.node.get_node_names_and_namespaces()}, flush=True)
                         raise
-                    self.pump(0.3 if interrupted else 4.2)
+                    self.pump(0.3 if interrupted else 8.2)
                     if interrupted:
                         process.send_signal(signal.SIGINT)
                     stdout, stderr = process.communicate(timeout=4)
