@@ -200,6 +200,8 @@ class RealGateway(FakeGateway):
         self.fake_hover = False
         self.closed = False
         self.hover_confirmed_by_pilot = False
+        self.bench_started_ns = time.monotonic_ns()
+        self.bench_session_expired = False
         self.arbiter.start()
         try:
             self.state_receiver.start()
@@ -266,9 +268,28 @@ class RealGateway(FakeGateway):
                  vertical=values[1])
         return True
 
+    def tick_grounded_bench(self, mono_ns):
+        """Poll replies and expire the grounded bench without periodic RC output."""
+        if (not self.bench_session_expired and
+                mono_ns - self.bench_started_ns >= self.guard.limits.maximum_session_ns):
+            self.bench_session_expired = True
+            self.log('bench_session_expired')
+            if not self.guard.landing_latched:
+                self.abort('bench_session_expired', mono_ns=mono_ns)
+        try:
+            self.arbiter.transport_call('poll', mono_ns)
+            self.refresh_telemetry(mono_ns)
+        except OSError:
+            self.log('grounded_bench_link_error')
+            self.guard.link(False)
+            self.arbiter.transport.close()
+
     def tick(self, ros_ns=None, mono_ns=None):
         mono_ns = time.monotonic_ns() if mono_ns is None else mono_ns
         ros_ns = time.time_ns() if ros_ns is None else ros_ns
+        if self.mode == 'grounded-bench':
+            self.tick_grounded_bench(mono_ns)
+            return
         try:
             self.refresh_telemetry(mono_ns)
         except OSError:
@@ -282,6 +303,16 @@ class RealGateway(FakeGateway):
 
     def close(self):
         if not self.closed:
+            if self.mode == 'grounded-bench':
+                # A grounded pulse always ends in neutral. On close, send one
+                # final neutral and do not retry a land command against an
+                # aircraft that is already grounded.
+                self.arbiter.neutral(time.monotonic_ns())
+                self.guard.link(False)
+                self.arbiter.transport.close()
+                self.state_receiver.close()
+                self.closed = True
+                return
             if self.guard.armed:
                 self.abort('window_close')
             self.arbiter.shutdown(time.monotonic_ns())
@@ -354,7 +385,9 @@ def main(argv=None):
         root.title(('FAKE' if args.mode == 'fake' else args.mode.upper())
                    + ' Tello gateway — Space abort')
         status = tk.StringVar(
-            value=args.mode.upper() + ' DISABLED — focus this window for Space')
+            value=(args.mode.upper() +
+                   (' — 60 s limit; Space aborts' if args.mode == 'grounded-bench'
+                    else ' DISABLED — focus this window for Space')))
         tk.Label(root, textvariable=status, width=72, pady=18).pack()
 
         def arm_fake():
@@ -405,6 +438,11 @@ def main(argv=None):
             if latest is not None:
                 gateway.receive(latest)
             gateway.tick()
+            if (args.mode == 'grounded-bench' and
+                    gateway.bench_session_expired):
+                status.set('BENCH SESSION EXPIRED — shutting down')
+                root.after_idle(close)
+                return
             if gateway.guard.landing_latched:
                 status.set('ABORT LATCHED — landing requested/unconfirmed; '
                            + gateway.guard.status()['landing_delivery'])
@@ -440,6 +478,12 @@ def main(argv=None):
             }
             with open(args.trace, 'x', encoding='utf-8') as output:
                 json.dump({'fake': args.mode == 'fake', 'mode': args.mode,
+                           'grounded_bench_session': ({
+                               'started_ns': gateway.bench_started_ns,
+                               'maximum_duration_ns':
+                               gateway.guard.limits.maximum_session_ns,
+                               'expired': gateway.bench_session_expired,
+                           } if args.mode == 'grounded-bench' else None),
                            'events': list(gateway.events),
                            'events_omitted': gateway.events_omitted,
                            'decision_receipts': [

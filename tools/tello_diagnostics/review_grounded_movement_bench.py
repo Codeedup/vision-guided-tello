@@ -13,8 +13,9 @@ NEUTRAL = 'rc 0 0 0 0'
 
 
 def review(trace):
-    """Return a deterministic pass/fail report for a grounded-bench trace."""
+    """Audit grounded-bench wire mapping and local abort evidence."""
     errors = []
+    warnings = []
     if type(trace) is not dict:
         return {'pass': False, 'errors': ['Trace must be an object']}
     if trace.get('fake') is not False or trace.get('mode') != 'grounded-bench':
@@ -59,6 +60,18 @@ def review(trace):
     replies = trace.get('sdk_replies')
     if type(replies) is not list:
         errors.append('Missing SDK reply records')
+        replies = []
+    else:
+        for reply in replies:
+            if (type(reply) is not dict or type(reply.get('reply')) is not str
+                    or type(reply.get('observed_ns')) is not int
+                    or reply.get('correlation') != 'UNCORRELATED_SDK_REPLY'):
+                errors.append('SDK reply record is malformed or falsely correlated')
+                break
+        if any(type(reply) is dict and reply.get('reply') == 'error'
+               for reply in replies):
+            warnings.append('SDK error replies are uncorrelated; they cannot be '
+                            'assigned to land or RC attempts')
     observations = trace.get('physical_observations')
     if (type(observations) is not list or len(observations) != 1
             or type(observations[0]) is not dict
@@ -80,10 +93,53 @@ def review(trace):
         errors.append('Each signed axis may be pulsed at most once per bench')
     if set(nonzero) != PULSES:
         errors.append('All four signed single-axis checks must be present')
+    gateway_events = trace.get('events')
+    if type(gateway_events) is not list:
+        errors.append('Missing gateway lifecycle events')
+        gateway_events = []
+    operator_inputs = [event for event in gateway_events
+                       if type(event) is dict and
+                       event.get('event') == 'operator_input']
+    if len(operator_inputs) != 1 or operator_inputs[0].get('cause') != 'space':
+        errors.append('Focused Space abort event is missing or repeated')
+    abort_dispatches = [event for event in gateway_events
+                        if type(event) is dict and
+                        event.get('event') == 'abort_dispatch']
+    if (len(abort_dispatches) != 1 or
+            abort_dispatches[0].get('attempts') != 1):
+        errors.append('Abort dispatch must report exactly one land attempt')
+    land_attempts = [event for event in gateway_events
+                     if type(event) is dict and
+                     event.get('event') == 'land_attempt']
+    if len(land_attempts) != 1 or land_attempts[0].get('retry_number') != 1:
+        errors.append('Grounded abort must make one bounded land attempt')
+    if attempts.count('land') != 1:
+        errors.append('Grounded abort must emit exactly one land packet')
+    if len(attempts) < 3 or attempts[-3:] != [NEUTRAL, 'land', NEUTRAL]:
+        errors.append('Abort must send neutral, one land packet, then final neutral')
+    session = trace.get('grounded_bench_session')
+    if (type(session) is not dict or type(session.get('started_ns')) is not int
+            or type(session.get('maximum_duration_ns')) is not int
+            or type(session.get('expired')) is not bool):
+        errors.append('Missing bounded-session metadata')
+    elif session['expired']:
+        errors.append('Grounded-bench session expired before completion')
+    elif (not events or type(events[-1]) is not dict
+          or type(events[-1].get('mono_ns')) is not int
+          or events[-1]['mono_ns'] - session['started_ns'] < 0
+          or events[-1]['mono_ns'] - session['started_ns'] >
+          session['maximum_duration_ns']):
+        errors.append('Grounded-bench session exceeded its configured duration')
+    if any(event.get('event') == 'bench_session_expired'
+           for event in gateway_events if type(event) is dict):
+        errors.append('Session expired before the full operator procedure completed')
     if attempts and attempts[-1] != NEUTRAL:
         errors.append('Final wire command is not neutral')
-    return {'pass': not errors, 'errors': errors, 'pulses': nonzero,
-            'attempt_count': len(attempts)}
+    return {'pass': not errors,
+            'scope': 'WIRE_MAPPING_AND_LOCAL_ABORT_ONLY',
+            'landing_delivery': 'UNCONFIRMED',
+            'errors': errors, 'warnings': warnings, 'pulses': nonzero,
+            'attempt_count': len(attempts), 'sdk_reply_count': len(replies)}
 
 
 def main(argv=None):

@@ -300,6 +300,38 @@ def test_grounded_bench_rejects_upstream_and_only_emits_single_axis_pulses():
     gateway.close()
 
 
+def test_grounded_bench_space_abort_sends_one_land_without_retry_stream():
+    transport = FakeTransport()
+    state = StateFeed()
+    gateway = RealGateway('grounded-bench', transport, state)
+    gateway.abort(mono_ns=gateway.bench_started_ns + 1)
+    after_abort = len(attempts(gateway))
+    gateway.tick(mono_ns=gateway.bench_started_ns + 2_000_000_000)
+    assert len(attempts(gateway)) == after_abort
+    assert attempts(gateway)[-2:] == ['rc 0 0 0 0', 'land']
+    assert attempts(gateway).count('land') == 1
+    gateway.close()
+    assert attempts(gateway)[-1] == 'rc 0 0 0 0'
+    assert not transport.connected
+    assert not gateway.guard.connected
+    assert state.closed
+
+
+def test_grounded_bench_session_expiry_aborts_and_latches_once():
+    transport = FakeTransport()
+    gateway = RealGateway('grounded-bench', transport, StateFeed())
+    expiry = gateway.bench_started_ns + gateway.guard.limits.maximum_session_ns
+    gateway.tick(mono_ns=expiry)
+    gateway.tick(mono_ns=expiry + 20_000_000)
+    assert gateway.bench_session_expired
+    assert [event['event'] for event in gateway.events].count(
+        'bench_session_expired') == 1
+    assert attempts(gateway)[-2:] == ['rc 0 0 0 0', 'land']
+    assert attempts(gateway).count('land') == 1
+    gateway.close()
+    assert attempts(gateway)[-1] == 'rc 0 0 0 0'
+
+
 def test_flight_requires_current_state_and_local_hover_confirmation():
     state = StateFeed(Telemetry(1, 80, 70))
     gateway = RealGateway('flight', FakeTransport(), state)

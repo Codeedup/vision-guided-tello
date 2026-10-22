@@ -226,7 +226,10 @@ No current height or SDK `ok` alone can satisfy real hover/landed confirmation.
 
 The movement-capable single-owner path has passed offline design/validation.
 Before any propellers-on session, exercise its mapping and abort behavior in a
-separate reviewed propellers-off procedure. The successful stage 3 diagnostic
+separate reviewed propellers-off procedure in
+[`grounded_movement_bench.md`](grounded_movement_bench.md). The first Stage D
+trace exposed an unbounded grounded-bench lifecycle; repeat only after the
+documented fix passes local checks and hosted CI. The successful stage 3 diagnostic
 has no nonzero RC, takeoff or real land path and cannot substitute for this gate. Follow
 [`handoff_2026-10-22.md`](handoff_2026-10-22.md#how-to-continue) in order.
 
