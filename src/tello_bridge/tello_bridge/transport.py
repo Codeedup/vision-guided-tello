@@ -92,6 +92,10 @@ class FakeTransport:
     def send_land(self, mono_ns):
         self._send('land', mono_ns)
 
+    def enter_sdk_mode(self, mono_ns):
+        """Explicitly request SDK mode; a reply remains uncorrelated evidence."""
+        self._send('command', mono_ns)
+
     def poll(self, mono_ns):
         while self.pending and self.pending[0][0] <= mono_ns:
             _, command = self.pending.popleft()
@@ -167,6 +171,10 @@ class UdpSdkTransport:
 
     def send_land(self, mono_ns):
         self._send('land', mono_ns)
+
+    def enter_sdk_mode(self, mono_ns):
+        """Explicitly request SDK mode; a reply remains uncorrelated evidence."""
+        self._send('command', mono_ns)
 
     def poll(self, mono_ns):
         if self.socket is None:

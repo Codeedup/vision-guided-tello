@@ -10,7 +10,10 @@ import pytest
 
 from tello_bridge.forward_approved import encode_approved
 from tello_bridge.policy import FRESH_NS
-from tello_bridge.windows_gateway import decode_packet, FakeGateway, main
+from tello_bridge.policy import Telemetry
+from tello_bridge.transport import FakeTransport
+from tello_bridge.windows_gateway import (decode_packet, FakeGateway, RealGateway,
+                                          main)
 
 EPOCH = 1_800_000_000_000_000_000
 
@@ -227,5 +230,62 @@ def test_gateway_keyboard_interrupt_closes_and_saves_trace(tmp_path):
         main(['--bind', '127.0.0.1', '--port', '5010', '--trace', str(trace)])
     result = json.loads(trace.read_text())
     assert result['fake'] is True
+    assert result['mode'] == 'fake'
+    assert result['events_omitted'] == result['transport_events_omitted'] == 0
     assert result['events'][-1]['event'] == 'operator_interrupt'
     assert not marker.exists()
+
+
+class StateFeed:
+    def __init__(self, telemetry=None):
+        self.telemetry = telemetry
+        self.started = self.closed = False
+
+    def start(self):
+        self.started = True
+
+    def read(self, _mono_ns):
+        return self.telemetry
+
+    def close(self):
+        self.closed = True
+
+
+def test_grounded_bench_rejects_upstream_and_only_emits_single_axis_pulses():
+    transport = FakeTransport()
+    gateway = RealGateway('grounded-bench', transport, StateFeed())
+    assert attempts(gateway) == ['command']
+    assert not gateway.receive(packet())
+    for axis, values in RealGateway.BENCH_AXES.items():
+        assert gateway.bench_pulse(axis)
+        assert attempts(gateway)[-2:] == [
+            f'rc {values[0]} 0 {values[1]} 0', 'rc 0 0 0 0']
+    assert not gateway.bench_pulse('mixed-axis')
+    gateway.close()
+
+
+def test_flight_requires_current_state_and_local_hover_confirmation():
+    state = StateFeed(Telemetry(1, 80, 70))
+    gateway = RealGateway('flight', FakeTransport(), state)
+    assert gateway.receive(packet(enabled=False, tracking=False,
+                                  lateral=0, vertical=0), EPOCH + 1, 1)
+    gateway.tick(EPOCH + 1, 1)
+    assert gateway.confirm_hover(1)
+    assert gateway.arm_flight(EPOCH + 2, 2)
+    assert gateway.receive(packet(EPOCH + 3, EPOCH + 3), EPOCH + 3, 3)
+    gateway.tick(EPOCH + 3, 3)
+    assert attempts(gateway)[-1] == 'rc 5 0 -4 0'
+    stale = RealGateway('flight', FakeTransport(), StateFeed(Telemetry(-1, 80, 70)))
+    assert not stale.confirm_hover(1)
+
+
+@pytest.mark.parametrize('args', [
+    ['--mode', 'grounded-bench', '--bind', '127.0.0.1', '--port', '5010',
+     '--trace', 'new.json'],
+    ['--mode', 'flight', '--hardware', '--tello-bind', '192.168.10.2',
+     '--pilot-present', '--propellers-removed', '--bind', '127.0.0.1',
+     '--port', '5010', '--trace', 'new.json'],
+])
+def test_real_mode_assertions_fail_closed(args):
+    with pytest.raises(SystemExit):
+        main(args)

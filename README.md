@@ -52,6 +52,8 @@ Start with the [22 October handoff](docs/handoff_2026-10-22.md) and follow the
 [readiness audit](docs/readiness_2026-10-13.md) maps requirements to code/tests and
 lists the remaining physical-mode design and hardware blockers. Per-axis limits
 and a 60-second development session cap are configurable; defaults are not flight tuned.
+The [movement-gateway design gate](docs/movement_gateway_offline_design.md)
+defines the separate grounded-bench and future-flight processes.
 See [Windows/WSL setup](docs/windows_wsl_setup.md), [authority and interfaces](docs/architecture.md),
 [offline validation](docs/offline_validation.md), [current checkpoint](docs/current_checkpoint.md)
 and [dependency/model provenance](docs/provenance.md).
