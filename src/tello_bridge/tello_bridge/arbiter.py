@@ -57,6 +57,11 @@ class Arbiter:
 
     def transport_fault(self, mono_ns, reason='TRANSPORT_FAULT'):
         """Latch motion off and make best-effort neutral then land attempts."""
+        if not self.authority.armed and not self.authority.landing_latched:
+            self.authority.link(False)
+            self.transport.close()
+            self.owned_last_tick = False
+            return
         if not self.authority.landing_latched:
             self.authority.request_land(reason)
         self.neutral(mono_ns)

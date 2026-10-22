@@ -256,6 +256,16 @@ def test_neutral_failure_still_attempts_land_and_keeps_retry_channel():
     assert guard.landing_latched and not guard.armed and guard.connected
 
 
+def test_unarmed_transport_fault_closes_without_landing():
+    transport = FakeTransport()
+    arbiter = Arbiter(transport)
+    arbiter.start()
+    arbiter.transport_fault(1)
+    assert not arbiter.authority.connected
+    assert not arbiter.authority.landing_latched
+    assert not any(event.get('attempt') == 'land' for event in transport.events)
+
+
 def test_shutdown_neutral_then_land_without_motor_cut():
     transport = FakeTransport()
     transport.start()
