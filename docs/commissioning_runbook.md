@@ -2,9 +2,10 @@
 
 Updated 22 October 2026. Run **one stage at a time**. These are prepared user
 commands, not automatic aircraft authorization. The enabled FAKE target-loss
-repeat and the first grounded harmless real-SDK bench have passed. The current
-stage is design and offline validation of a guarded movement-capable Windows
-command path and operator recovery behavior; no propellers-on test is ready.
+repeat and the first grounded harmless real-SDK bench have passed. Stage C,
+offline design and validation of the guarded Windows movement path, passed on
+`76b6c96` including hosted Jazzy CI. The next gate is a separate, reviewed
+propellers-removed movement bench; no propellers-on test is ready.
 See the [22 October handoff](handoff_2026-10-22.md). [Readiness blockers and
 source defaults](readiness_2026-10-13.md) remain binding.
 
@@ -223,10 +224,10 @@ No current height or SDK `ok` alone can satisfy real hover/landed confirmation.
 
 ## 4–6. Guarded movement path, manual baseline, isolated axes, then closed loop
 
-Before any propellers-on session, implement and review the movement-capable
-single-owner path offline, then exercise its mapping and abort behavior in a new
-propellers-off procedure. The successful stage 3 diagnostic has no nonzero RC,
-takeoff or real land path and cannot substitute for this gate. Follow
+The movement-capable single-owner path has passed offline design/validation.
+Before any propellers-on session, exercise its mapping and abort behavior in a
+separate reviewed propellers-off procedure. The successful stage 3 diagnostic
+has no nonzero RC, takeoff or real land path and cannot substitute for this gate. Follow
 [`handoff_2026-10-22.md`](handoff_2026-10-22.md#how-to-continue) in order.
 
 All propellers-on stages are user-supervised only.

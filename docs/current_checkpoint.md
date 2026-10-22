@@ -96,7 +96,8 @@ remains open. No exact physical stopping guarantee is inferred.
 
 Implemented components and reproducible commands are in
 [offline validation](offline_validation.md), [architecture/authority](architecture.md),
-and [provenance](provenance.md). The CI workflow is prepared but unrun on GitHub.
+and [provenance](provenance.md). Hosted Jazzy CI passed on `76b6c96`; this does
+not add hardware compatibility evidence.
 Real ROS actuation remains gated until network/flight-state/operator evidence
 supports commissioning. The proposed SDK/video adapters have fake/loopback tests,
 not standard-Tello hardware compatibility evidence.
