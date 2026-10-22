@@ -7,6 +7,7 @@ import ipaddress
 import json
 import math
 from pathlib import Path
+import re
 import socket
 import time
 
@@ -19,6 +20,15 @@ NEUTRAL = 'rc 0 0 0 0'
 SDK_HOST = '192.168.10.1'
 INPUT_TIMEOUT_NS = 250_000_000
 REPLY_TIMEOUT_NS = 2_000_000_000
+
+
+def parse_height_cm(reply):
+    """Parse strict numeric, cm, or observed dm height replies."""
+    match = re.fullmatch(r'(\d+)(cm|dm)?', reply)
+    if match is None:
+        raise ValueError('Invalid height reply')
+    value = int(match.group(1))
+    return value * 10 if match.group(2) == 'dm' else value
 
 
 class GroundedBench:
@@ -131,9 +141,14 @@ def run_bench(transport, listener, duration):
             if command == 'battery?' and (not reply.isdecimal()
                                           or not 25 <= int(reply) <= 100):
                 raise RuntimeError('Battery reply is low or invalid')
-            if command == 'height?' and (not reply.isdecimal()
-                                         or not 0 <= int(reply) <= 20):
-                raise RuntimeError('Grounded height reply is invalid')
+            if command == 'height?':
+                try:
+                    height_cm = parse_height_cm(reply)
+                except ValueError as error:
+                    raise RuntimeError(
+                        'Grounded height reply is invalid') from error
+                if not 0 <= height_cm <= 20:
+                    raise RuntimeError('Grounded height reply is invalid')
         deadline = time.monotonic() + duration
         next_send = 0.0
         next_query = time.monotonic() + 1.0

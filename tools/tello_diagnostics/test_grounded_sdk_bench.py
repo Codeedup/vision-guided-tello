@@ -6,7 +6,8 @@ import threading
 import time
 from unittest.mock import Mock, patch
 
-from grounded_sdk_bench import GroundedBench, NEUTRAL, run_bench
+from grounded_sdk_bench import (GroundedBench, NEUTRAL, parse_height_cm,
+                                run_bench)
 
 import pytest
 
@@ -60,6 +61,22 @@ def decision(stamp, **changes):
     return json.dumps(item).encode()
 
 
+@pytest.mark.parametrize('reply,expected', [
+    ('0', 0), ('20', 20), ('0cm', 0), ('20cm', 20), ('0dm', 0), ('2dm', 20),
+])
+def test_height_reply_units(reply, expected):
+    """Normalize documented centimetres and observed decimetres."""
+    assert parse_height_cm(reply) == expected
+
+
+@pytest.mark.parametrize('reply', ['', '-1', '1.0', ' 0dm', '0dm ',
+                                   '0DM', '0m', 'nan'])
+def test_height_reply_rejects_ambiguous_forms(reply):
+    """Reject malformed or ambiguous height replies."""
+    with pytest.raises(ValueError):
+        parse_height_cm(reply)
+
+
 def test_input_freshness_and_nonzero_rejection_still_wire_neutral():
     """Reject movement and expired input at the final bench boundary."""
     transport = ReplyTransport()
@@ -103,6 +120,15 @@ def test_complete_bench_query_neutral_and_distinct_receipts():
     assert report['physical_outcome'] == 'UNKNOWN'
     # The fake reply labels are intentionally unsuitable as real SDK evidence.
     assert not review(report)['pass']
+
+
+def test_observed_decimetre_height_completes_grounded_gate():
+    """Accept the aircraft's unit-tagged zero-height reply."""
+    transport = ReplyTransport(['ok', '76', '0dm'])
+    listener = Mock()
+    listener.recvfrom.side_effect = BlockingIOError
+    report = run_bench(transport, listener, 0.06)
+    assert report['outcome'] == 'COMPLETED'
 
 
 def test_no_sdk_reply_stops_bench_and_closes_after_neutral():

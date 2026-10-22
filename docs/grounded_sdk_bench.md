@@ -18,6 +18,11 @@ the neutral loop starts; a periodic battery query checks for reply loss without
 pausing neutral output. A missing or invalid reply ends the run. On normal
 shutdown or a fault, it attempts one final neutral send and closes its socket.
 
+The grounded-height check accepts the SDK guide's numeric centimetre response,
+an explicit `cm` suffix, and the `dm` suffix observed from the test aircraft.
+It converts decimetres to centimetres before applying the 0–20 cm grounded
+bound; all other forms are rejected.
+
 ## Operator run on Windows
 
 1. Physically remove all propellers and keep the aircraft on the ground.
