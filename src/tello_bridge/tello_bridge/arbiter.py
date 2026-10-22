@@ -40,10 +40,28 @@ class Arbiter:
             self.transport_call('send_rc', 0, 0, mono_ns)
             self.last_rc = (0, 0, 0, 0)
             self.last_send_ns = mono_ns
+            return True
         except OSError:
-            if self.authority.armed:
-                self.authority.request_land('TRANSPORT_FAULT')
-            self.authority.link(False)
+            # A failed neutral send does not prove the socket cannot still
+            # deliver land. Callers that own an active session keep going.
+            return False
+
+    def _land_once(self, mono_ns):
+        if not self.authority.connected or not self.authority.next_land_attempt(mono_ns):
+            return False
+        try:
+            self.transport_call('send_land', mono_ns)
+            return True
+        except OSError:
+            return False
+
+    def transport_fault(self, mono_ns, reason='TRANSPORT_FAULT'):
+        """Latch motion off and make best-effort neutral then land attempts."""
+        if not self.authority.landing_latched:
+            self.authority.request_land(reason)
+        self.neutral(mono_ns)
+        self._land_once(mono_ns)
+        self.owned_last_tick = True
 
     def takeover(self, mono_ns):
         self.authority.disarm('MANUAL_TAKEOVER')
@@ -57,12 +75,7 @@ class Arbiter:
         self.neutral(mono_ns)
         if not self.authority.connected:
             return
-        if self.authority.next_land_attempt(mono_ns):
-            try:
-                self.transport_call('send_land', mono_ns)
-            except OSError:
-                self.authority.link(False)
-                self.transport.close()
+        self._land_once(mono_ns)
         self.owned_last_tick = True
 
     def tick(self, ros_ns, mono_ns):
@@ -83,21 +96,14 @@ class Arbiter:
                 self.neutral(mono_ns)
             self.owned_last_tick = owned
         except OSError:
-            if self.authority.armed:
-                self.authority.request_land('TRANSPORT_FAULT')
-            self.authority.link(False)
-            self.transport.close()
+            self.transport_fault(mono_ns)
 
     def shutdown(self, mono_ns):
         # Normal shutdown requests land only while software owns active flight.
         if self.authority.armed:
             self.authority.request_land('SHUTDOWN')
         self.neutral(mono_ns)
-        if self.authority.connected and self.authority.landing_latched:
-            try:
-                if self.authority.next_land_attempt(mono_ns):
-                    self.transport_call('send_land', mono_ns)
-            except OSError:
-                pass
+        if self.authority.landing_latched:
+            self._land_once(mono_ns)
         self.authority.disarm('SHUTDOWN')
         self.transport.close()

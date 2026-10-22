@@ -269,7 +269,11 @@ class RealGateway(FakeGateway):
     def tick(self, ros_ns=None, mono_ns=None):
         mono_ns = time.monotonic_ns() if mono_ns is None else mono_ns
         ros_ns = time.time_ns() if ros_ns is None else ros_ns
-        self.refresh_telemetry(mono_ns)
+        try:
+            self.refresh_telemetry(mono_ns)
+        except OSError:
+            self.log('state_link_error')
+            self.arbiter.transport_fault(mono_ns, 'STATE_LINK_FAULT')
         if self.mode == 'flight' and self.guard.armed:
             self.guard.heartbeat(mono_ns)
         before = self.guard.land_attempts

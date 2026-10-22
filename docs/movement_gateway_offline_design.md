@@ -26,6 +26,13 @@ neutral-first bounded normal-land request. Delivery remains unconfirmed. A
 named, independent trained pilot and recovery procedure are still required for
 host or Wi-Fi failure; neither gateway mode makes Space independent.
 
+In flight mode, stale or failed state telemetry and SDK transport errors latch
+the session off, attempt neutral RC, then attempt normal land while retaining
+the local socket for the bounded retries. A failed neutral send does not suppress
+the land attempt. This is only the first layer: a dead Windows host cannot run
+this handler, and a lost Wi-Fi link cannot carry its land packet. The aircraft's
+confirmed no-command landing fallback covers that separate failure path.
+
 ## Grounded-bench evidence
 
 Create a new evidence directory and trace filename for every run. The gateway
@@ -49,4 +56,5 @@ or a completed landing.
 
 `tools/run_offline_checks.sh` must pass on the committed revision. Focused tests
 cover assertion failures, fresh-state/hover/arm gating, discarded bench ingress,
-the four allowed pulses, neutral sequencing, and reviewer rejection paths.
+the four allowed pulses, neutral sequencing, telemetry/transport-loss landing
+attempts, and reviewer rejection paths.

@@ -231,12 +231,29 @@ def test_fault_reconnect_has_no_cached_motion():
     transport.fail_next = True
     arbiter.tick(EPOCH + 1, 1)
     assert guard.landing_latched
-    assert not guard.connected
+    assert guard.connected
+    assert [event.get('attempt') for event in transport.events][-3:] == [
+        'rc 5 0 -4 0', 'rc 0 0 0 0', 'land']
     arbiter.start()
     arbiter.tick(EPOCH + 2, 2)
     assert not guard.armed
     assert not any(event.get('attempt') == 'rc 5 0 -4 0' and event['os_send_result'] == 'FAKE_SENT'
                    for event in transport.events)
+
+
+def test_neutral_failure_still_attempts_land_and_keeps_retry_channel():
+    transport = FakeTransport()
+    transport.start()
+    guard = prepared()
+    moving(guard)
+    arbiter = Arbiter(transport, guard)
+    transport.fail_next = True
+    arbiter.operator_abort(1)
+    attempts = [event.get('attempt') for event in transport.events]
+    assert attempts[-2:] == ['rc 0 0 0 0', 'land']
+    assert transport.events[-2]['os_send_result'] == 'FAKE_ERROR'
+    assert transport.events[-1]['os_send_result'] == 'FAKE_SENT'
+    assert guard.landing_latched and not guard.armed and guard.connected
 
 
 def test_shutdown_neutral_then_land_without_motor_cut():

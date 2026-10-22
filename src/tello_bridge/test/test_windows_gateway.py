@@ -109,15 +109,17 @@ def test_held_space_reply_delay_replay_and_reconnect_cannot_rearm():
     assert gateway.guard.reason == 'OPERATOR_ABORT'
 
 
-def test_link_loss_and_failed_neutral_leave_unconfirmed_abort():
-    """A failed neutral send remains visibly unconfirmed."""
+def test_link_loss_still_attempts_land_after_neutral_send_error():
+    """A neutral error does not suppress a best-effort land command."""
     gateway = ready()
     gateway.arbiter.transport.fail_next = True
     gateway.abort(ros_ns=EPOCH + 4, mono_ns=4)
     assert gateway.guard.landing_latched
     assert gateway.guard.reason == 'OPERATOR_ABORT'
-    assert gateway.guard.status()['landing_delivery'] == 'LINK_UNAVAILABLE'
-    assert 'land' not in attempts(gateway)
+    assert gateway.guard.status()['landing_delivery'] == 'REQUEST_PENDING_UNCONFIRMED'
+    assert attempts(gateway)[-1] == 'land'
+    assert gateway.arbiter.transport.events[-2]['os_send_result'] == 'FAKE_ERROR'
+    assert gateway.arbiter.transport.events[-1]['os_send_result'] == 'FAKE_SENT'
 
 
 def test_silent_upstream_lands_without_ros_acknowledgement():
@@ -250,6 +252,11 @@ class StateFeed:
         self.closed = True
 
 
+class FailedStateFeed(StateFeed):
+    def read(self, _mono_ns):
+        raise OSError('Simulated state-link failure')
+
+
 def test_grounded_bench_rejects_upstream_and_only_emits_single_axis_pulses():
     transport = FakeTransport()
     gateway = RealGateway('grounded-bench', transport, StateFeed())
@@ -276,6 +283,27 @@ def test_flight_requires_current_state_and_local_hover_confirmation():
     assert attempts(gateway)[-1] == 'rc 5 0 -4 0'
     stale = RealGateway('flight', FakeTransport(), StateFeed(Telemetry(-1, 80, 70)))
     assert not stale.confirm_hover(1)
+
+
+def test_state_link_failure_latches_and_sends_neutral_then_land():
+    transport = FakeTransport()
+    gateway = RealGateway('flight', transport,
+                          StateFeed(Telemetry(1, 80, 70)))
+    assert gateway.receive(packet(enabled=False, tracking=False,
+                                  lateral=0, vertical=0), EPOCH + 1, 1)
+    gateway.tick(EPOCH + 1, 1)
+    assert gateway.confirm_hover(1)
+    assert gateway.arm_flight(EPOCH + 2, 2)
+    assert gateway.receive(packet(EPOCH + 3, EPOCH + 3), EPOCH + 3, 3)
+    gateway.tick(EPOCH + 3, 3)
+    assert attempts(gateway)[-1] == 'rc 5 0 -4 0'
+
+    gateway.state_receiver = FailedStateFeed()
+    gateway.tick(EPOCH + 4, 4)
+
+    assert gateway.guard.landing_latched and not gateway.guard.armed
+    assert gateway.guard.reason == 'STATE_LINK_FAULT'
+    assert attempts(gateway)[-2:] == ['rc 0 0 0 0', 'land']
 
 
 @pytest.mark.parametrize('args', [
