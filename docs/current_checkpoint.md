@@ -1,5 +1,10 @@
 # Current readiness checkpoint — 13 October 2026
 
+> **Superseded operating status:** the enabled FAKE target-loss trial and the
+> first grounded harmless real-SDK bench have since passed. Use the
+> [22 October handoff](handoff_2026-10-22.md) for the current stage and exact
+> continuation. The record below remains historical evidence.
+
 The full handoff was reviewed before edits, local commit `35ee9c1` preserved,
 and concrete CI/lifecycle findings repaired. Source validation revision:
 `3e098392038177b3372fdcebd0f192473d807ea1`. The release commit adds documentation/evidence only;

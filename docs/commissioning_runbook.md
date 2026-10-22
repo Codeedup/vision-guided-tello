@@ -2,8 +2,11 @@
 
 Updated 22 October 2026. Run **one stage at a time**. These are prepared user
 commands, not automatic aircraft authorization. The enabled FAKE target-loss
-repeat has been reviewed; the next aircraft stage is the grounded SDK bench.
-[Readiness blockers and source defaults](readiness_2026-10-13.md) remain binding.
+repeat and the first grounded harmless real-SDK bench have passed. The current
+stage is design and offline validation of a guarded movement-capable Windows
+command path and operator recovery behavior; no propellers-on test is ready.
+See the [22 October handoff](handoff_2026-10-22.md). [Readiness blockers and
+source defaults](readiness_2026-10-13.md) remain binding.
 
 ## Before the next test — nodes stopped
 
@@ -186,6 +189,12 @@ An appropriate recording still has to be supplied/captured by the user.
 
 ## 3. Grounded real-SDK command bench
 
+**Completed 22 October 2026 on revision `db2e2d5`.** The reviewed ten-second
+trace passed with 195 allowlisted sends, 10 separately recorded replies, only
+neutral RC, a final neutral send and no observed aircraft sound or movement.
+See the [current handoff](handoff_2026-10-22.md) for hashes, limitations and the
+exact continuation. Do not repeat this stage merely to advance commissioning.
+
 Use the separate [grounded SDK bench procedure](grounded_sdk_bench.md). Its
 Windows process is the single real SDK owner and has a literal four-command
 allowlist: SDK entry, battery and height queries, and zero RC. The ROS bridge
@@ -208,7 +217,15 @@ Separate attempted command, OS send, SDK reply, and observed physical outcome.
 Bench wire behaviour cannot establish airborne signs or confirmed landing.
 No current height or SDK `ok` alone can satisfy real hover/landed confirmation.
 
-## 4–6. Manual baseline, isolated axes, then closed loop — user-supervised only
+## 4–6. Guarded movement path, manual baseline, isolated axes, then closed loop
+
+Before any propellers-on session, implement and review the movement-capable
+single-owner path offline, then exercise its mapping and abort behavior in a new
+propellers-off procedure. The successful stage 3 diagnostic has no nonzero RC,
+takeoff or real land path and cannot substitute for this gate. Follow
+[`handoff_2026-10-22.md`](handoff_2026-10-22.md#how-to-continue) in order.
+
+All propellers-on stages are user-supervised only.
 
 **WIFI: connect the laptop to the Tello network.** Each physical session requires
 fresh battery/aircraft inspection, guards fitted, clear space, textured floor,

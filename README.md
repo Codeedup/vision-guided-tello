@@ -43,11 +43,12 @@ Each demo requires a new output directory and writes synthetic reports/logs.
 It explicitly enables the software mock and fake bridge for a bounded session;
 ordinary launches require a separate operator enable.
 
-The current user test is a clean enabled FAKE target-loss repeat: at least five
-seconds of actual tracking, deliberate removal, latched landing intent, then hand
-return without restart. The earlier 0.12-second tracking interval did not pass.
-Follow the [staged commissioning runbook](docs/commissioning_runbook.md), with
-Windows/WSL terminals, new clock evidence and paired traces. The
+The enabled FAKE target-loss repeat and the first grounded, propellers-removed,
+harmless real-SDK transport bench have passed. The project is now at offline
+design and validation of a guarded movement-capable Windows command path and its
+operator recovery behavior. No propellers-on or real movement test is ready.
+Start with the [22 October handoff](docs/handoff_2026-10-22.md) and follow the
+[staged commissioning runbook](docs/commissioning_runbook.md). The
 [readiness audit](docs/readiness_2026-10-13.md) maps requirements to code/tests and
 lists the remaining physical-mode design and hardware blockers. Per-axis limits
 and a 60-second development session cap are configurable; defaults are not flight tuned.
