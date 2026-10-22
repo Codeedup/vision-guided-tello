@@ -233,6 +233,16 @@ def test_gateway_keyboard_interrupt_closes_and_saves_trace(tmp_path):
     assert result['fake'] is True
     assert result['mode'] == 'fake'
     assert result['events_omitted'] == result['transport_events_omitted'] == 0
+    assert result['decision_receipts'] == []
+    assert [item['command'] for item in result['command_attempts']] == [
+        'rc 0 0 0 0']
+    assert [item['command'] for item in result['os_send_results']] == [
+        'rc 0 0 0 0']
+    assert result['sdk_replies'] == []
+    assert result['physical_observations'] == [{
+        'outcome': 'UNKNOWN',
+        'source': 'not observable from SDK transport',
+    }]
     assert result['events'][-1]['event'] == 'operator_interrupt'
     assert not marker.exists()
 
@@ -255,6 +265,26 @@ class StateFeed:
 class FailedStateFeed(StateFeed):
     def read(self, _mono_ns):
         raise OSError('Simulated state-link failure')
+
+
+class MissingStateFeed(StateFeed):
+    def read(self, _mono_ns):
+        return None
+
+
+class RefreshingStateFeed(StateFeed):
+    def read(self, mono_ns):
+        return Telemetry(mono_ns, 80, 70)
+
+
+class StartupFailedStateFeed(StateFeed):
+    def start(self):
+        raise OSError('Simulated state-feed startup failure')
+
+
+class EntryFailedTransport(FakeTransport):
+    def enter_sdk_mode(self, _mono_ns):
+        raise OSError('Simulated SDK-entry send failure')
 
 
 def test_grounded_bench_rejects_upstream_and_only_emits_single_axis_pulses():
@@ -304,6 +334,39 @@ def test_state_link_failure_latches_and_sends_neutral_then_land():
     assert gateway.guard.landing_latched and not gateway.guard.armed
     assert gateway.guard.reason == 'STATE_LINK_FAULT'
     assert attempts(gateway)[-2:] == ['rc 0 0 0 0', 'land']
+
+
+def test_missing_periodic_state_sample_latches_and_lands():
+    transport = FakeTransport()
+    state = RefreshingStateFeed(Telemetry(1, 80, 70))
+    gateway = RealGateway('flight', transport, state)
+    assert gateway.receive(packet(enabled=False, tracking=False,
+                                  lateral=0, vertical=0), EPOCH + 1, 1)
+    gateway.tick(EPOCH + 1, 1)
+    assert gateway.confirm_hover(1)
+    assert gateway.arm_flight(EPOCH + 2, 2)
+    assert gateway.receive(packet(EPOCH + 3, EPOCH + 3), EPOCH + 3, 3)
+    gateway.tick(EPOCH + 3, 3)
+    gateway.tick(EPOCH + 200_000_000, 200_000_000)
+    gateway.tick(EPOCH + 400_000_000, 400_000_000)
+    gateway.state_receiver = MissingStateFeed()
+    gateway.tick(EPOCH + 600_000_000, 600_000_000)
+    gateway.tick(EPOCH + 800_000_000, 800_000_000)
+    gateway.tick(EPOCH + 900_000_000, 900_000_000)
+    assert gateway.guard.landing_latched
+    assert gateway.guard.reason == 'TELEMETRY_OR_LIFECYCLE_FAULT'
+    assert attempts(gateway)[-2:] == ['rc 0 0 0 0', 'land']
+
+
+@pytest.mark.parametrize('transport,state', [
+    (FakeTransport(), StartupFailedStateFeed()),
+    (EntryFailedTransport(), StateFeed()),
+])
+def test_real_gateway_startup_failure_closes_owned_resources(transport, state):
+    with pytest.raises(OSError):
+        RealGateway('grounded-bench', transport, state)
+    assert not transport.connected
+    assert state.closed
 
 
 @pytest.mark.parametrize('args', [

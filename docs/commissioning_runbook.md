@@ -252,8 +252,10 @@ Record code/configuration, lighting/distance, latency, successes and failures.
 Takeover revokes software authority; it does not prove physical manual control.
 Controlled land is intent until confirmed by trustworthy evidence. Emergency
 motor cut is a distinct last-resort physical procedure, never an ordinary stop.
-A same-Wi-Fi override is not an independent link. Host/process/link failure can
-remove all software commands, so identify the tested remaining recovery path.
-Never deliberately kill the only command link in flight to recreate a simulated
-fault; plan and prove ground fault injection and recovery first. No automatic
-flight is authorized or performed by this runbook.
+A same-Wi-Fi override is not an independent link. The user reports that the
+aircraft's onboard no-command landing has been tested; a pilot must monitor for
+that response during host/process/link failure. Before any propellers-on stage,
+define and verify the pilot's manual intervention method if the onboard fallback
+does not work. Never deliberately kill the only command link in flight to
+recreate a simulated fault; plan and prove ground fault injection and recovery
+first. No automatic flight is authorized or performed by this runbook.

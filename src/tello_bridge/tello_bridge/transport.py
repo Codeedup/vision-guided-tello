@@ -75,10 +75,13 @@ class FakeTransport:
         self.connected = True
 
     def _send(self, text, mono_ns):
+        attempt_observed_ns = time.monotonic_ns()
         ok = self.connected and not self.fail_next
         self.fail_next = False
+        send_observed_ns = time.monotonic_ns()
         self.record({'attempt': text, 'mono_ns': mono_ns,
-                     'attempt_observed_ns': time.monotonic_ns(),
+                     'attempt_observed_ns': attempt_observed_ns,
+                     'os_send_observed_ns': send_observed_ns,
                      'os_send_result': 'FAKE_SENT' if ok else 'FAKE_ERROR',
                      'acknowledgement': None})
         if not ok:
@@ -157,10 +160,12 @@ class UdpSdkTransport:
             if self.socket is None:
                 raise OSError('Transport not explicitly opened')
             count = self.socket.sendto(command.encode('ascii'), self.peer)
+            event['os_send_observed_ns'] = time.monotonic_ns()
             event['os_send_result'] = count
             if count != len(command):
                 raise OSError('Incomplete UDP send')
         except OSError as error:
+            event.setdefault('os_send_observed_ns', time.monotonic_ns())
             event['error'] = type(error).__name__
             self.record(event)
             raise

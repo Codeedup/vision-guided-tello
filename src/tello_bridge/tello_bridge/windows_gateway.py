@@ -432,12 +432,44 @@ def main(argv=None):
         marker.unlink(missing_ok=True)
         if gateway:
             gateway.close()
+            transport_events = list(gateway.arbiter.transport.events)
+            decision_names = {
+                'decision', 'decision_rejected', 'decision_discarded_aborted',
+                'decision_discarded_grounded_bench', 'local_flight_arm',
+                'pilot_hover_confirmation', 'bench_pulse',
+            }
             with open(args.trace, 'x', encoding='utf-8') as output:
                 json.dump({'fake': args.mode == 'fake', 'mode': args.mode,
                            'events': list(gateway.events),
                            'events_omitted': gateway.events_omitted,
-                           'transport_events': list(
-                               gateway.arbiter.transport.events),
+                           'decision_receipts': [
+                               event for event in gateway.events
+                               if event.get('event') in decision_names],
+                           'command_attempts': [
+                               {'command': event['attempt'],
+                                'mono_ns': event.get('mono_ns'),
+                                'observed_ns': event.get('attempt_observed_ns'),
+                                'physical_outcome': event.get('physical_outcome')}
+                               for event in transport_events
+                               if 'attempt' in event],
+                           'os_send_results': [
+                               {'command': event['attempt'],
+                                'result': event.get('os_send_result'),
+                                'error': event.get('error'),
+                                'observed_ns': event.get('os_send_observed_ns')}
+                               for event in transport_events
+                               if 'attempt' in event],
+                           'sdk_replies': [
+                               {'reply': event['reply'],
+                                'observed_ns': event.get('reply_observed_ns'),
+                                'correlation': event.get('acknowledgement')}
+                               for event in transport_events
+                               if 'reply' in event],
+                           'physical_observations': [{
+                               'outcome': 'UNKNOWN',
+                               'source': 'not observable from SDK transport',
+                           }],
+                           'transport_events': transport_events,
                            'transport_events_omitted':
                            gateway.arbiter.transport.events_omitted,
                            'final_status': gateway.guard.status()},

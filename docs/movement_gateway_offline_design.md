@@ -23,8 +23,11 @@ emergency command.
 
 The local Space key, focus loss while armed, and normal close use the existing
 neutral-first bounded normal-land request. Delivery remains unconfirmed. A
-named, independent trained pilot and recovery procedure are still required for
-host or Wi-Fi failure; neither gateway mode makes Space independent.
+pilot monitors the aircraft during host or Wi-Fi failure and relies first on
+the user-reported, tested onboard no-command landing behavior. Space is not an
+independent recovery path. Before any propellers-on stage, the pilot's manual
+intervention method if that fallback fails must be identified and separately
+verified; this offline design does not establish it.
 
 In flight mode, stale or failed state telemetry and SDK transport errors latch
 the session off, attempt neutral RC, then attempt normal land while retaining
@@ -32,6 +35,11 @@ the local socket for the bounded retries. A failed neutral send does not suppres
 the land attempt. This is only the first layer: a dead Windows host cannot run
 this handler, and a lost Wi-Fi link cannot carry its land packet. The aircraft's
 confirmed no-command landing fallback covers that separate failure path.
+
+The provisional offline flight envelope is +/-5 SDK units independently on
+lateral and vertical axes, with a 60-second maximum armed session. These values
+are for offline validation only. They are uncalibrated and do not authorize
+propellers-on use.
 
 ## Grounded-bench evidence
 
@@ -46,11 +54,14 @@ trace before any subsequent stage:
 python tools/tello_diagnostics/review_grounded_movement_bench.py $trace
 ```
 
-The reviewer rejects a non-real/non-bench trace, event omissions, forbidden wire
-commands, any mixed-axis/non-capped output, repeated signed pulses, a pulse not
-immediately followed by neutral, or a non-neutral final wire command. Passing
-this review is evidence of commands and OS sends only—not movement, flight state,
-or a completed landing.
+The reviewer rejects a non-real/non-bench trace, event omissions, missing or
+mismatched decision/command/OS-send/SDK-reply/physical-observation records,
+failed or incomplete OS sends, forbidden wire commands, any mixed-axis/non-capped
+output, repeated signed pulses, a pulse not immediately followed by neutral, or
+a non-neutral final wire command. All four single-axis signs must be present.
+Physical outcome must remain `UNKNOWN`.
+Passing this review is evidence of commands and OS sends only—not movement,
+flight state, or a completed landing.
 
 ## Offline acceptance
 
