@@ -62,6 +62,8 @@ class TestFlightRosPath(unittest.TestCase):
         self.candidate = self.node.create_publisher(CandidateCommand,
                                                     'candidate_command', 1)
         self.lease = self.node.create_publisher(Empty, 'flight_operator_lease', 1)
+        self.release_ack = self.node.create_publisher(
+            Empty, 'flight_pilot_release_ack', 1)
         self.releases = 0
         self.release_subscription = self.node.create_subscription(
             Bool, 'flight_pilot_release', self.on_release, 1)
@@ -72,6 +74,7 @@ class TestFlightRosPath(unittest.TestCase):
         self.wait(lambda: self.autonomy.service_is_ready() and
                   self.candidate.get_subscription_count() == 1 and
                   self.lease.get_subscription_count() == 1 and
+                  self.release_ack.get_subscription_count() == 1 and
                   self.release_subscription.get_publisher_count() == 1, 5.0)
 
     def pump(self, seconds=0.02):
@@ -91,6 +94,9 @@ class TestFlightRosPath(unittest.TestCase):
     def on_release(self, msg):
         self.assertFalse(msg.data)
         self.releases += 1
+        # Simulate a lost first acknowledgement; retry must reach this reader.
+        if self.releases >= 2:
+            self.release_ack.publish(Empty())
 
     def wait(self, predicate, seconds):
         deadline = time.monotonic() + seconds
@@ -124,7 +130,7 @@ class TestFlightRosPath(unittest.TestCase):
         self.assertTrue(self.gateway.confirm_hover())
         self.assertTrue(self.gateway.arm_flight())
         self.assertTrue(self.gateway.release_trial(UDP))
-        self.wait(lambda: self.releases == 1, 2.0)
+        self.wait(lambda: self.releases >= 2, 2.0)
         self.assertFalse(self.gateway.release_trial(UDP))
         self.set_autonomy(True)
         for _ in range(8):

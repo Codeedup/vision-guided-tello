@@ -114,12 +114,15 @@ def main(argv=None):
         raise ValueError('Flight trial requires use_sim_time=false')
     publisher = node.create_publisher(CandidateCommand, 'candidate_command', 1)
     lease_publisher = node.create_publisher(Empty, 'flight_operator_lease', 1)
+    release_ack_publisher = node.create_publisher(
+        Empty, 'flight_pilot_release_ack', 1)
     autonomy = node.create_client(SetBool, 'mission_manager/set_autonomy')
     release = {'received': False, 'fake': None}
 
     def on_release(msg):
         release['received'] = True
         release['fake'] = msg.data
+        release_ack_publisher.publish(Empty())
 
     release_subscription = node.create_subscription(
         Bool, 'flight_pilot_release', on_release, 1)
@@ -187,7 +190,8 @@ def main(argv=None):
     try:
         wait_for(node, lambda: publisher.get_subscription_count() == 1 and
                  lease_publisher.get_subscription_count() == 1 and
-                 release_subscription.get_publisher_count() == 1, 5.0)
+                 release_subscription.get_publisher_count() == 1 and
+                 release_ack_publisher.get_subscription_count() == 1, 5.0)
         call_autonomy(False)
         wait_for(node, lambda: recent_approved(
             lambda msg: not msg.autonomy_enabled and not msg.tracking_allowed and

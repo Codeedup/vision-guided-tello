@@ -3,6 +3,7 @@
 import argparse
 import json
 import socket
+import time
 
 
 def valid_session_id(value):
@@ -114,6 +115,25 @@ def main(argv=None):
         node.create_subscription(Empty, 'flight_operator_lease',
                                  lambda _msg: send_lease(), 1)
         release_publisher = node.create_publisher(Bool, 'flight_pilot_release', 1)
+        release = {'fake': None, 'deadline_ns': 0}
+
+        def acknowledge_release(_msg):
+            release['fake'] = None
+
+        node.create_subscription(Empty, 'flight_pilot_release_ack',
+                                 acknowledge_release, 1)
+
+        def broadcast_release():
+            fake = release['fake']
+            if fake is None:
+                return
+            if time.monotonic_ns() >= release['deadline_ns']:
+                release['fake'] = None
+                node.get_logger().warning('Trial release was not acknowledged')
+                return
+            release_publisher.publish(Bool(data=fake))
+
+        node.create_timer(0.05, broadcast_release)
 
         def poll_release():
             for _ in range(8):
@@ -129,7 +149,9 @@ def main(argv=None):
                     node.get_logger().warning('Trial release rejected')
                     continue
                 node.get_logger().info('Trial release accepted')
-                release_publisher.publish(Bool(data=fake))
+                release['fake'] = fake
+                release['deadline_ns'] = time.monotonic_ns() + 1_000_000_000
+                broadcast_release()
 
         node.create_timer(0.02, poll_release)
 
