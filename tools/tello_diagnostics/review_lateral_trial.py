@@ -87,10 +87,18 @@ def review(trace, report):
             [item.get('command') for item in sends] != attempts):
         errors.append('Command attempts or OS sends differ from transport trace')
         sends = []
-    if any(type(item) is not dict or type(item.get('result')) is not int or
-           type(item.get('command')) is not str or
-           item['result'] != len(item['command'].encode('ascii', errors='ignore')) or
-           type(item.get('observed_ns')) is not int for item in sends):
+    if dry_run:
+        if any(type(item) is not dict or item.get('result') != 'FAKE_SENT' or
+               item.get('error') is not None or type(item.get('observed_ns')) is not int
+               for item in sends):
+            errors.append('FAKE transport attempt was incomplete or failed')
+        if any(type(item) is not dict or item.get('fake') is not True or
+               item.get('physical_outcome') != 'UNKNOWN' for item in attempted):
+            errors.append('FAKE transport evidence has invalid provenance')
+    elif any(type(item) is not dict or type(item.get('result')) is not int or
+             type(item.get('command')) is not str or
+             item['result'] != len(item['command'].encode('ascii', errors='ignore')) or
+             type(item.get('observed_ns')) is not int for item in sends):
         errors.append('OS send was incomplete or missing')
     if not attempts or attempts[0] != 'command' or attempts[-1] != NEUTRAL:
         errors.append('SDK entry or final neutral is missing')
@@ -130,8 +138,9 @@ def review(trace, report):
             errors.append('Movement preceded the pilot release')
 
     replies = trace.get('sdk_replies')
+    expected_reply_marker = 'SIMULATED_ONLY' if dry_run else 'UNCORRELATED_SDK_REPLY'
     if type(replies) is not list or any(
-            type(item) is not dict or item.get('correlation') != 'UNCORRELATED_SDK_REPLY'
+            type(item) is not dict or item.get('correlation') != expected_reply_marker
             for item in replies):
         errors.append('SDK replies are missing or falsely correlated')
     elif any(item.get('reply') == 'error' for item in replies):

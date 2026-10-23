@@ -25,16 +25,20 @@ The local Space key, focus loss while armed, and normal close use the existing
 neutral-first bounded normal-land request. Delivery remains unconfirmed. A
 pilot monitors the aircraft during host or Wi-Fi failure and relies first on
 the user-reported, tested onboard no-command landing behavior. Space is not an
-independent recovery path. Before any propellers-on stage, the pilot's manual
-intervention method if that fallback fails must be identified and separately
-verified; this offline design does not establish it.
+independent recovery path. On 23 October 2026 the user marked the pilot
+contingency gate complete: app takeover has been practiced, and the pilot accepts
+the built-in onboard landing fallback without a separate intervention method
+for hypothetical fallback failure. This records the pilot's risk decision; it
+does not establish a software or hardware guarantee that the fallback cannot
+fail.
 
 In flight mode, stale or failed state telemetry and SDK transport errors latch
 the session off, attempt neutral RC, then attempt normal land while retaining
 the local socket for the bounded retries. A failed neutral send does not suppress
 the land attempt. This is only the first layer: a dead Windows host cannot run
-this handler, and a lost Wi-Fi link cannot carry its land packet. The aircraft's
-confirmed no-command landing fallback covers that separate failure path.
+this handler, and a lost Wi-Fi link cannot carry its land packet. The pilot
+accepts the onboard no-command landing behavior as the fallback for that
+separate failure path; this is not a software or hardware guarantee.
 
 The provisional offline flight envelope is +/-5 SDK units independently on
 lateral and vertical axes, with a 60-second maximum armed session. These values

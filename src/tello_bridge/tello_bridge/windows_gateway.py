@@ -90,7 +90,7 @@ class FakeGateway:
         """Start only a FAKE transport."""
         self.arbiter = Arbiter(transport or FakeTransport(), Authority())
         self.arbiter.start()
-        self.events = deque(maxlen=4096)
+        self.events = deque(maxlen=8192)
         self.events_omitted = 0
         self.fake_hover = False
         self.closed = False
@@ -244,7 +244,7 @@ class RealGateway(FakeGateway):
         self.state_receiver = state_receiver
         self.arbiter = Arbiter(transport, Authority(Limits(
             maximum_lateral_command=5, maximum_vertical_command=5)))
-        self.events = deque(maxlen=4096)
+        self.events = deque(maxlen=8192)
         self.events_omitted = 0
         self.fake_hover = False
         self.closed = False

@@ -58,6 +58,10 @@ def test_matching_fake_rehearsal_passes_only_as_fake():
     trace, report = fixture()
     trace.update(fake=True, mode='flight-dry-run')
     report['dry_run'] = True
+    for event in trace['transport_events']:
+        event.update(fake=True, physical_outcome='UNKNOWN')
+    for item in trace['os_send_results']:
+        item['result'] = 'FAKE_SENT'
     result = review(trace, report)
     assert result['pass'], result['errors']
     assert result['scope'] == 'FAKE_SINGLE_AXIS_PATH_ONLY'

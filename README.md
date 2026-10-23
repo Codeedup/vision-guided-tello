@@ -44,10 +44,16 @@ Each demo requires a new output directory and writes synthetic reports/logs.
 It explicitly enables the software mock and fake bridge for a bounded session;
 ordinary launches require a separate operator enable.
 
-The enabled FAKE target-loss repeat, grounded real-SDK transport bench, and
-propellers-removed Stage D movement bench have passed. The pilot has reported
-app-only takeoff, hover, landing, and the onboard no-command landing response.
-The supervised first ROS lateral pulse remains a separate physical stage.
+The enabled FAKE target-loss repeat and grounded real-SDK transport bench have
+passed. The propellers-removed Stage D movement bench was exercised, but its
+saved trace does not pass the current reviewer and must be repeated. The
+Windows/WSL lateral-trial FAKE rehearsal has passed. The pilot reports
+practicing app takeover and considers the built-in onboard no-command landing
+fallback sufficient; this contingency gate is recorded as pilot-accepted, not
+as a guarantee established by software.
+App takeoff and normal landing remain pilot-controlled. The supervised first
+ROS lateral pulse remains a separate physical stage. See the
+[23 October progress handoff](docs/handoff_2026-10-23.md).
 Follow the [first lateral trial procedure](docs/first_lateral_trial.md) and
 [staged commissioning runbook](docs/commissioning_runbook.md). The
 [readiness audit](docs/readiness_2026-10-13.md) maps requirements to code/tests and

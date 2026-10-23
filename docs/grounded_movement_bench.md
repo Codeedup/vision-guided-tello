@@ -82,6 +82,9 @@ are warnings, not proof that the aircraft rejected `land`; OS acceptance is not
 proof of aircraft execution. Record the pilot's physical observation separately.
 
 Keep propellers removed after this procedure. No takeoff, flight, motion-sign
-claim, or propellers-on test is authorized by a Stage D pass. The pilot's manual
-intervention method if the onboard landing fallback fails remains a separate
-gate before any propellers-on stage.
+claim, or propellers-on test is authorized by a Stage D pass. The pilot
+contingency gate is recorded as complete per the user's 23 October decision:
+app takeover is practiced, and the pilot accepts the built-in onboard no-command
+landing fallback without a separate intervention method for hypothetical
+fallback failure. This is pilot risk acceptance, not proof that the fallback
+cannot fail.

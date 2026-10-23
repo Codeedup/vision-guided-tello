@@ -2,7 +2,7 @@
 
 > **Superseded operating status:** the enabled FAKE target-loss trial and the
 > first grounded harmless real-SDK bench have since passed. Use the
-> [22 October handoff](handoff_2026-10-22.md) for the current stage and exact
+> [23 October handoff](handoff_2026-10-23.md) for the current stage and exact
 > continuation. The record below remains historical evidence.
 
 The full handoff was reviewed before edits, local commit `35ee9c1` preserved,

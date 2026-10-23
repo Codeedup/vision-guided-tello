@@ -25,12 +25,17 @@ yaw commands remain zero.
   takeoff/hover/normal landing and the aircraft's no-command landing after
   about 15 seconds; these are pilot observations, not software proof that a
   `land` packet succeeds.
-- The pilot states and has practiced the intervention method to use if app
-  takeover and onboard no-command landing fail. Do not use Space or disconnect
-  as proof of landing. Space, gateway focus loss while armed, and window close
-  request neutral then land; landing delivery is unconfirmed. If control or
-  direction is unexpected, stop the trial, use the pilot's recovery method,
-  and land. Never test failure recovery by deliberately killing the live link.
+- **Pilot contingency gate (recorded complete by the user on 23 October 2026):**
+  the pilot reports app takeover practice with no takeover failure and accepts
+  the aircraft's built-in onboard no-command landing as the recovery fallback.
+  The user considers this sufficient without a separate intervention method
+  for a hypothetical failure of that fallback. This is pilot/user risk
+  acceptance; it is not proof that the fallback cannot fail. Do not use Space or
+  disconnect as proof of landing. Space, gateway focus loss while armed, and
+  window close request neutral then land; landing delivery is unconfirmed. If
+  control or direction is unexpected, stop the trial and use the pilot's
+  accepted recovery plan. Never test failure recovery by deliberately killing
+  the live link.
 - Close all other SDK clients, including earlier gateway, ROS flight, and
   diagnostics. The app is the pilot's recovery tool. The flight gateway must
   be the only computer SDK socket owner. Use a new run ID and create-only

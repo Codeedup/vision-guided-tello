@@ -264,8 +264,11 @@ Controlled land is intent until confirmed by trustworthy evidence. Emergency
 motor cut is a distinct last-resort physical procedure, never an ordinary stop.
 A same-Wi-Fi override is not an independent link. The user reports that the
 aircraft's onboard no-command landing has been tested; a pilot must monitor for
-that response during host/process/link failure. Before any propellers-on stage,
-define and verify the pilot's manual intervention method if the onboard fallback
-does not work. Never deliberately kill the only command link in flight to
-recreate a simulated fault; plan and prove ground fault injection and recovery
-first. No automatic flight is authorized or performed by this runbook.
+that response during host/process/link failure. On 23 October 2026 the user
+marked the pilot contingency gate complete: app takeover has been practiced and
+the pilot accepts the built-in onboard landing fallback without a separate
+intervention method for hypothetical fallback failure. This records the pilot's
+risk decision and does not prove the fallback cannot fail. Never deliberately
+kill the only command link in flight to recreate a simulated fault; plan and
+prove ground fault injection and recovery first. No automatic flight is
+authorized or performed by this runbook.
