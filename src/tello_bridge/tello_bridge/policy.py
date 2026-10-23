@@ -21,6 +21,7 @@ class Command:
     land: bool
     lateral: float
     vertical: float
+    source_frame_id: str = ''
 
 
 @dataclass(frozen=True)

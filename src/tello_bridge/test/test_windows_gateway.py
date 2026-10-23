@@ -8,22 +8,30 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from tello_bridge.forward_approved import encode_approved
+from tello_bridge.forward_approved import (decode_trial_release, encode_approved,
+                                           encode_lease)
+from tello_bridge.lateral_trial import PulseEnvelope, trial_frame_id
 from tello_bridge.policy import FRESH_NS, Telemetry
 from tello_bridge.transport import FakeTransport
 from tello_bridge.windows_gateway import (decode_packet, FakeGateway, main,
                                           RealGateway)
 
 EPOCH = 1_800_000_000_000_000_000
+SESSION = 'a' * 32
+FRAME_ID = trial_frame_id(SESSION)
 
 
 def packet(decision=EPOCH, source=EPOCH, enabled=True, tracking=True,
-           land=False, lateral=5, vertical=-4):
+           land=False, lateral=5, vertical=-4, flight=False,
+           frame_id=FRAME_ID):
     """Build one version-one wire decision."""
-    return json.dumps({'version': 1, 'decision_ns': decision,
-                       'source_ns': source, 'enabled': enabled,
-                       'tracking': tracking, 'land': land,
-                       'lateral': lateral, 'vertical': vertical}).encode()
+    item = {'version': 2 if flight else 1, 'decision_ns': decision,
+            'source_ns': source, 'enabled': enabled,
+            'tracking': tracking, 'land': land,
+            'lateral': lateral, 'vertical': vertical}
+    if flight:
+        item.update(session_id=SESSION, source_frame_id=frame_id)
+    return json.dumps(item).encode()
 
 
 def ready():
@@ -204,12 +212,18 @@ def test_forwarder_preserves_stamps_and_has_no_side_effects():
 
     msg = SimpleNamespace(header=SimpleNamespace(stamp=stamp(EPOCH + 3)),
                           source_header=SimpleNamespace(
-                              stamp=stamp(EPOCH + 2)),
+                              stamp=stamp(EPOCH + 2), frame_id=FRAME_ID),
                           autonomy_enabled=True, tracking_allowed=True,
                           request_land=False, lateral=3.0, vertical=-2.0)
     decoded = decode_packet(encode_approved(msg))
     assert decoded.decision_ns == EPOCH + 3
     assert decoded.source_ns == EPOCH + 2
+    flight = decode_packet(encode_approved(msg, SESSION), SESSION, FRAME_ID)
+    assert flight.source_frame_id == FRAME_ID
+    with pytest.raises(ValueError):
+        decode_packet(encode_approved(msg, SESSION), 'b' * 32, FRAME_ID)
+    with pytest.raises(ValueError):
+        decode_packet(encode_approved(msg, SESSION), SESSION, 'other')
     with pytest.raises(SystemExit):
         main([])
 
@@ -245,6 +259,30 @@ def test_gateway_keyboard_interrupt_closes_and_saves_trace(tmp_path):
     }]
     assert result['events'][-1]['event'] == 'operator_interrupt'
     assert not marker.exists()
+
+
+def test_flight_dry_run_opens_no_aircraft_transport(tmp_path):
+    root = Mock()
+    root.mainloop.side_effect = KeyboardInterrupt
+    tkinter = SimpleNamespace(Tk=lambda: root, StringVar=Mock(),
+                              Label=Mock(return_value=Mock()),
+                              Button=Mock(return_value=Mock()))
+    trace = tmp_path / 'flight-dry-run.json'
+    marker = tmp_path / 'armed'
+    with patch.dict(sys.modules, {'tkinter': tkinter}), \
+            patch('tello_bridge.windows_gateway.socket.socket'), \
+            patch('tello_bridge.windows_gateway.OwnerLock'), \
+            patch('tello_bridge.windows_gateway.fake_arm_marker', return_value=marker), \
+            patch('tello_bridge.windows_gateway.UdpSdkTransport') as hardware:
+        main(['--mode', 'flight-dry-run', '--bind', '127.0.0.1',
+              '--port', '5011', '--trace', str(trace),
+              '--upstream-ip', '127.0.0.1', '--flight-session-id', SESSION,
+              '--flight-source-frame-id', FRAME_ID])
+    hardware.assert_not_called()
+    result = json.loads(trace.read_text())
+    assert result['fake'] is True
+    assert result['mode'] == 'flight-dry-run'
+    assert result['flight_session_id'] == SESSION
 
 
 class StateFeed:
@@ -334,29 +372,30 @@ def test_grounded_bench_session_expiry_aborts_and_latches_once():
 
 def test_flight_requires_current_state_and_local_hover_confirmation():
     state = StateFeed(Telemetry(1, 80, 70))
-    gateway = RealGateway('flight', FakeTransport(), state)
+    gateway = RealGateway('flight', FakeTransport(), state, SESSION, FRAME_ID)
     assert gateway.receive(packet(enabled=False, tracking=False,
-                                  lateral=0, vertical=0), EPOCH + 1, 1)
+                                  lateral=0, vertical=0, flight=True), EPOCH + 1, 1)
     gateway.tick(EPOCH + 1, 1)
     assert gateway.confirm_hover(1)
     assert gateway.arm_flight(EPOCH + 2, 2)
-    assert gateway.receive(packet(EPOCH + 3, EPOCH + 3), EPOCH + 3, 3)
+    assert gateway.receive(packet(EPOCH + 3, EPOCH + 3, flight=True), EPOCH + 3, 3)
     gateway.tick(EPOCH + 3, 3)
     assert attempts(gateway)[-1] == 'rc 5 0 -4 0'
-    stale = RealGateway('flight', FakeTransport(), StateFeed(Telemetry(-1, 80, 70)))
+    stale = RealGateway('flight', FakeTransport(), StateFeed(Telemetry(-1, 80, 70)),
+                        SESSION, FRAME_ID)
     assert not stale.confirm_hover(1)
 
 
 def test_state_link_failure_latches_and_sends_neutral_then_land():
     transport = FakeTransport()
     gateway = RealGateway('flight', transport,
-                          StateFeed(Telemetry(1, 80, 70)))
+                          StateFeed(Telemetry(1, 80, 70)), SESSION, FRAME_ID)
     assert gateway.receive(packet(enabled=False, tracking=False,
-                                  lateral=0, vertical=0), EPOCH + 1, 1)
+                                  lateral=0, vertical=0, flight=True), EPOCH + 1, 1)
     gateway.tick(EPOCH + 1, 1)
     assert gateway.confirm_hover(1)
     assert gateway.arm_flight(EPOCH + 2, 2)
-    assert gateway.receive(packet(EPOCH + 3, EPOCH + 3), EPOCH + 3, 3)
+    assert gateway.receive(packet(EPOCH + 3, EPOCH + 3, flight=True), EPOCH + 3, 3)
     gateway.tick(EPOCH + 3, 3)
     assert attempts(gateway)[-1] == 'rc 5 0 -4 0'
 
@@ -371,23 +410,95 @@ def test_state_link_failure_latches_and_sends_neutral_then_land():
 def test_missing_periodic_state_sample_latches_and_lands():
     transport = FakeTransport()
     state = RefreshingStateFeed(Telemetry(1, 80, 70))
-    gateway = RealGateway('flight', transport, state)
+    gateway = RealGateway('flight', transport, state, SESSION, FRAME_ID)
     assert gateway.receive(packet(enabled=False, tracking=False,
-                                  lateral=0, vertical=0), EPOCH + 1, 1)
+                                  lateral=0, vertical=0, flight=True), EPOCH + 1, 1)
     gateway.tick(EPOCH + 1, 1)
     assert gateway.confirm_hover(1)
     assert gateway.arm_flight(EPOCH + 2, 2)
-    assert gateway.receive(packet(EPOCH + 3, EPOCH + 3), EPOCH + 3, 3)
+    assert gateway.receive(packet(EPOCH + 3, EPOCH + 3, flight=True), EPOCH + 3, 3)
     gateway.tick(EPOCH + 3, 3)
+    assert gateway.receive(encode_lease(SESSION, 1), mono_ns=200_000_000)
     gateway.tick(EPOCH + 200_000_000, 200_000_000)
+    assert gateway.receive(encode_lease(SESSION, 2), mono_ns=400_000_000)
     gateway.tick(EPOCH + 400_000_000, 400_000_000)
     gateway.state_receiver = MissingStateFeed()
+    assert gateway.receive(encode_lease(SESSION, 3), mono_ns=600_000_000)
     gateway.tick(EPOCH + 600_000_000, 600_000_000)
+    assert gateway.receive(encode_lease(SESSION, 4), mono_ns=800_000_000)
     gateway.tick(EPOCH + 800_000_000, 800_000_000)
     gateway.tick(EPOCH + 900_000_000, 900_000_000)
     assert gateway.guard.landing_latched
     assert gateway.guard.reason == 'TELEMETRY_OR_LIFECYCLE_FAULT'
     assert attempts(gateway)[-2:] == ['rc 0 0 0 0', 'land']
+
+
+def test_flight_lease_is_external_and_missing_lease_lands():
+    gateway = RealGateway('flight', FakeTransport(), RefreshingStateFeed(),
+                          SESSION, FRAME_ID)
+    assert gateway.receive(packet(enabled=False, tracking=False, lateral=0,
+                                  vertical=0, flight=True), EPOCH + 1, 1)
+    gateway.tick(EPOCH + 1, 1)
+    assert gateway.confirm_hover(1)
+    assert gateway.arm_flight(EPOCH + 2, 2)
+    assert gateway.receive(packet(EPOCH + 3, EPOCH + 3, flight=True), EPOCH + 3, 3)
+    gateway.tick(EPOCH + 3, 3)
+    assert attempts(gateway)[-1] == 'rc 5 0 -4 0'
+    gateway.tick(EPOCH + 300_000_002, 300_000_002)
+    assert gateway.guard.reason == 'OPERATOR_LEASE_EXPIRED'
+    assert attempts(gateway)[-2:] == ['rc 0 0 0 0', 'land']
+
+
+def test_flight_session_source_and_lease_replay_fail_closed():
+    gateway = RealGateway('flight', FakeTransport(), RefreshingStateFeed(),
+                          SESSION, FRAME_ID)
+    assert not gateway.receive(packet(flight=True, frame_id='other'), EPOCH + 1, 1)
+    assert not gateway.receive(packet(), EPOCH + 2, 2)
+    assert gateway.receive(packet(enabled=False, tracking=False, lateral=0,
+                                  vertical=0, flight=True), EPOCH + 3, 3)
+    gateway.tick(EPOCH + 3, 3)
+    assert gateway.confirm_hover(3)
+    assert gateway.arm_flight(EPOCH + 4, 4)
+    assert gateway.receive(encode_lease(SESSION, 1), mono_ns=5)
+    assert not gateway.receive(encode_lease(SESSION, 1), mono_ns=6)
+    assert not gateway.receive(encode_lease('b' * 32, 2), mono_ns=7)
+    assert gateway.receive(packet(EPOCH + 8, EPOCH + 8, flight=True), EPOCH + 8, 8)
+    gateway.tick(EPOCH + 8, 8)
+    assert attempts(gateway)[-1] == 'rc 5 0 -4 0'
+
+
+def test_focused_pilot_release_is_one_shot_and_session_bound():
+    gateway = RealGateway('flight', FakeTransport(), RefreshingStateFeed(),
+                          SESSION, FRAME_ID)
+    sock = Mock()
+    sock.sendto.side_effect = lambda data, _peer: len(data)
+    gateway.last_upstream_peer = ('127.0.0.1', 5011)
+    assert not gateway.release_trial(sock)
+    assert gateway.receive(packet(enabled=False, tracking=False, lateral=0,
+                                  vertical=0, flight=True), EPOCH + 1, 1)
+    gateway.tick(EPOCH + 1, 1)
+    assert gateway.confirm_hover(1)
+    assert gateway.arm_flight(EPOCH + 2, 2)
+    assert gateway.release_trial(sock)
+    data, peer = sock.sendto.call_args.args
+    assert peer == gateway.last_upstream_peer
+    assert decode_trial_release(data, SESSION) is False
+    with pytest.raises(ValueError):
+        decode_trial_release(data, 'b' * 32)
+    assert not gateway.release_trial(sock)
+    assert sock.sendto.call_count == 1
+
+
+def test_pulse_envelope_neutralizes_by_monotonic_deadline_and_is_one_shot():
+    envelope = PulseEnvelope(-3, 100)
+    envelope.acquire()
+    assert envelope.value(9) == 0
+    envelope.pulse(10)
+    assert envelope.value(99_000_010) == -3
+    assert envelope.value(100_000_010) == 0
+    assert envelope.value(200_000_010) == 0
+    with pytest.raises(RuntimeError):
+        envelope.pulse(200_000_011)
 
 
 @pytest.mark.parametrize('transport,state', [

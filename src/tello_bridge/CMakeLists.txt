@@ -4,6 +4,7 @@ find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS scripts/tello_bridge_node scripts/tello_operator scripts/tello_approved_forwarder
+  scripts/tello_lateral_trial
   DESTINATION lib/${PROJECT_NAME})
 set(WEBCAM_TOOLS ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/webcam_perception)
 install(PROGRAMS ${WEBCAM_TOOLS}/ros_hand_receiver.py ${WEBCAM_TOOLS}/measure_pipeline.py
@@ -41,6 +42,8 @@ if(BUILD_TESTING)
     APPEND_ENV PYTHONPATH=${WEBCAM_TOOLS}/.. TIMEOUT 60)
   ament_add_pytest_test(synthetic_demo_tests test/test_demo.py TIMEOUT 120)
   add_launch_test(test/test_loopback_launch.py TIMEOUT 120
+    RUNNER "${ament_cmake_ros_DIR}/run_test_isolated.py")
+  add_launch_test(test/test_flight_ros_launch.py TIMEOUT 90
     RUNNER "${ament_cmake_ros_DIR}/run_test_isolated.py")
 endif()
 ament_package()

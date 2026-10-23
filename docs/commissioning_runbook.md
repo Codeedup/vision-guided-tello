@@ -207,8 +207,8 @@ and the Space-abort gateway remain FAKE-only. Review the saved trace with the
 included auditor before interpreting any SDK result.
 
 **WIFI: connect the laptop to the Tello network.** User-supervised, grounded,
-propellers removed. Current code has **no commissioned flight-capable ROS mode**.
-Do not invent an enable/takeoff command or switch the launcher to hardware.
+propellers removed. This stage used no flight-capable ROS mode. Do not invent
+an enable/takeoff command or switch this launcher to hardware.
 The first grounded bench does not enable a movement gateway. Resolve
 telemetry provenance/lifecycle evidence and an independent operator abort path
 before any later movement-capable stage.
@@ -245,6 +245,12 @@ movement alone, then vertical alone. Prove actual sign, neutral response and the
 available operator abort before tracking a hand. Then progress lateral tracking,
 vertical tracking and combined small motion. Manually maintain range; there is no
 autonomous distance hold, forward/backward command or yaw command.
+
+The supervised first lateral pulse has a separate
+[ROS and Windows procedure](first_lateral_trial.md). It requires a reviewed
+FAKE cross-host rehearsal before a real session and keeps app takeoff and normal
+landing with the pilot. The ROS trial source is synthetic; it does not run the
+camera or hand controller.
 
 Define each counted trial before measuring: e.g. a proposed 10-second eligible
 tracking window, fixed bounded hand movement, configured dead-zone centering,

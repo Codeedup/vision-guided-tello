@@ -4,11 +4,12 @@ Keep one eligible open hand near the image centre using lateral and vertical
 translation. Laptop perception feeds the existing ROS 2 Jazzy C++ controller and
 supervisor. Autonomous forward/backward and yaw stay zero. Distance remains manual.
 
-The software includes a passive evidence monitor, actual loopback
-UDP/ROS tests, an independently guarded **fake** command bridge, operator leases,
-frame sources, and an explicitly invoked non-actuating SDK/video diagnostic.
-Normal launch starts disabled. Hardware ROS actuation remains gated pending real
-network, lifecycle and operator-control evidence. This checkpoint is not flight readiness.
+The software includes a passive evidence monitor, loopback UDP/ROS tests, an
+independently guarded **fake** command bridge, operator leases, frame sources,
+and an explicitly invoked non-actuating SDK/video diagnostic. A separate,
+supervised ROS path can send one bounded lateral trial through the Windows
+gateway. It starts disabled and requires a local pilot arm and release. This
+path has passed offline tests; physical ROS movement is not yet verified.
 
 ```mermaid
 flowchart LR
@@ -43,17 +44,17 @@ Each demo requires a new output directory and writes synthetic reports/logs.
 It explicitly enables the software mock and fake bridge for a bounded session;
 ordinary launches require a separate operator enable.
 
-The enabled FAKE target-loss repeat and the first grounded, propellers-removed,
-harmless real-SDK transport bench have passed. The project is now at offline
-design and validation of a guarded movement-capable Windows command path and its
-operator recovery behavior. No propellers-on or real movement test is ready.
-Start with the [22 October handoff](docs/handoff_2026-10-22.md) and follow the
+The enabled FAKE target-loss repeat, grounded real-SDK transport bench, and
+propellers-removed Stage D movement bench have passed. The pilot has reported
+app-only takeoff, hover, landing, and the onboard no-command landing response.
+The supervised first ROS lateral pulse remains a separate physical stage.
+Follow the [first lateral trial procedure](docs/first_lateral_trial.md) and
 [staged commissioning runbook](docs/commissioning_runbook.md). The
 [readiness audit](docs/readiness_2026-10-13.md) maps requirements to code/tests and
 lists the remaining physical-mode design and hardware blockers. Per-axis limits
 and a 60-second development session cap are configurable; defaults are not flight tuned.
 The [movement-gateway design gate](docs/movement_gateway_offline_design.md)
-defines the separate grounded-bench and future-flight processes.
+defines the separate grounded-bench and flight processes.
 See [Windows/WSL setup](docs/windows_wsl_setup.md), [authority and interfaces](docs/architecture.md),
 [offline validation](docs/offline_validation.md), [current checkpoint](docs/current_checkpoint.md)
 and [dependency/model provenance](docs/provenance.md).

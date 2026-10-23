@@ -1,0 +1,4 @@
+#!/usr/bin/env python3
+from tello_bridge.lateral_trial import main
+
+raise SystemExit(main())

@@ -10,6 +10,7 @@ import tempfile
 import time
 
 from tello_bridge.arbiter import Arbiter
+from tello_bridge.forward_approved import valid_session_id
 from tello_bridge.policy import Authority, Command, Limits, Telemetry
 from tello_bridge.telemetry import StateReceiver
 from tello_bridge.transport import FakeTransport, OwnerLock, UdpSdkTransport
@@ -17,12 +18,14 @@ from tello_bridge.transport import FakeTransport, OwnerLock, UdpSdkTransport
 
 WIRE_KEYS = frozenset({'version', 'decision_ns', 'source_ns', 'enabled',
                        'tracking', 'land', 'lateral', 'vertical'})
+FLIGHT_WIRE_KEYS = WIRE_KEYS | {'session_id', 'source_frame_id'}
+LEASE_KEYS = frozenset({'version', 'kind', 'session_id', 'sequence'})
 
 
-def decode_packet(data):
-    """Decode a strict version-one decision without creating authority."""
+def decode_object(data):
+    """Parse one bounded JSON object without duplicate wire keys."""
     if len(data) > 512:
-        raise ValueError('Oversize decision')
+        raise ValueError('Oversize packet')
 
     def unique(pairs):
         item = {}
@@ -33,9 +36,25 @@ def decode_packet(data):
         return item
 
     item = json.loads(data.decode('utf-8'), object_pairs_hook=unique)
-    if (type(item) is not dict or frozenset(item) != WIRE_KEYS
-            or type(item['version']) is not int or item['version'] != 1):
+    if type(item) is not dict:
+        raise ValueError('Invalid wire object')
+    return item
+
+
+def decode_packet(data, session_id=None, source_frame_id=None):
+    """Decode a strict approved decision without creating authority."""
+    item = decode_object(data)
+    flight = session_id is not None
+    if (frozenset(item) != (FLIGHT_WIRE_KEYS if flight else WIRE_KEYS)
+            or type(item['version']) is not int
+            or item['version'] != (2 if flight else 1)
+            or (flight and item['session_id'] != session_id)):
         raise ValueError('Invalid wire schema')
+    if flight and (type(item['source_frame_id']) is not str or
+                   len(item['source_frame_id']) > 64 or
+                   (item['tracking'] and
+                    item['source_frame_id'] != source_frame_id)):
+        raise ValueError('Unexpected flight motion source')
     if (type(item['decision_ns']) is not int
             or type(item['source_ns']) is not int):
         raise ValueError('Invalid timestamp type')
@@ -44,7 +63,19 @@ def decode_packet(data):
         raise ValueError('Invalid flag type')
     return Command(item['decision_ns'], item['source_ns'], item['enabled'],
                    item['tracking'], item['land'],
-                   item['lateral'], item['vertical'])
+                   item['lateral'], item['vertical'],
+                   item['source_frame_id'] if flight else '')
+
+
+def decode_lease(data, session_id):
+    """Decode a flight lease separately from approved movement decisions."""
+    item = decode_object(data)
+    if (frozenset(item) != LEASE_KEYS or type(item['version']) is not int
+            or item['version'] != 2 or item['kind'] != 'operator_lease'
+            or item['session_id'] != session_id
+            or type(item['sequence']) is not int or item['sequence'] <= 0):
+        raise ValueError('Invalid operator lease')
+    return item['sequence']
 
 
 def fake_arm_marker(port):
@@ -85,13 +116,17 @@ class FakeGateway:
             self.log('decision_discarded_aborted')
             return False
         try:
-            command = decode_packet(data)
+            command = decode_packet(data, getattr(self, 'flight_session_id', None),
+                                    getattr(self, 'flight_source_frame_id', None))
         except (UnicodeError, ValueError, TypeError, KeyError) as error:
             self.log('decision_rejected', error=type(error).__name__)
             self.guard.command = None
             return False
         accepted = self.guard.accept(command, ros_ns, mono_ns)
-        self.log('decision', accepted=accepted, reason=self.guard.reason)
+        self.log('decision', accepted=accepted, reason=self.guard.reason,
+                 source_frame_id=command.source_frame_id,
+                 enabled=command.enabled, tracking=command.tracking,
+                 lateral=command.lateral, vertical=command.vertical)
         return accepted
 
     def prepare_fake_hover(self, ros_ns=None, mono_ns=None):
@@ -188,10 +223,24 @@ class RealGateway(FakeGateway):
         'vertical-positive': (0, 5), 'vertical-negative': (0, -5),
     }
 
-    def __init__(self, mode, transport, state_receiver):
+    def __init__(self, mode, transport, state_receiver, flight_session_id=None,
+                 flight_source_frame_id=None):
         if mode not in ('grounded-bench', 'flight'):
             raise ValueError('Invalid real gateway mode')
+        if (mode == 'flight' and not valid_session_id(flight_session_id)) or (
+                mode == 'grounded-bench' and flight_session_id is not None):
+            raise ValueError('Flight mode requires a unique session ID')
+        if (mode == 'flight' and (type(flight_source_frame_id) is not str or
+                                  flight_source_frame_id !=
+                                  'supervised_lateral_trial_' + flight_session_id)):
+            raise ValueError('Flight mode requires the trial source frame ID')
         self.mode = mode
+        self.flight_session_id = flight_session_id
+        self.flight_source_frame_id = flight_source_frame_id
+        self.last_lease_sequence = 0
+        self.last_upstream_peer = None
+        self.trial_release_sent = False
+        self.rehearsal = False
         self.state_receiver = state_receiver
         self.arbiter = Arbiter(transport, Authority(Limits(
             maximum_lateral_command=5, maximum_vertical_command=5)))
@@ -217,6 +266,19 @@ class RealGateway(FakeGateway):
             # The bench is locally scripted: no WSL decision can produce RC.
             self.log('decision_discarded_grounded_bench')
             return False
+        try:
+            sequence = decode_lease(data, self.flight_session_id)
+        except (UnicodeError, ValueError, TypeError, KeyError):
+            pass
+        else:
+            mono_ns = time.monotonic_ns() if mono_ns is None else mono_ns
+            if sequence <= self.last_lease_sequence:
+                self.log('operator_lease', accepted=False, sequence=sequence)
+                return False
+            self.last_lease_sequence = sequence
+            accepted = self.guard.heartbeat(mono_ns)
+            self.log('operator_lease', accepted=accepted, sequence=sequence)
+            return accepted
         return super().receive(data, ros_ns, mono_ns)
 
     def refresh_telemetry(self, mono_ns):
@@ -245,6 +307,29 @@ class RealGateway(FakeGateway):
                                   time.monotonic_ns() if mono_ns is None else mono_ns)
         self.log('local_flight_arm', accepted=bool(accepted))
         return bool(accepted)
+
+    def release_trial(self, sock):
+        """Let the focused pilot release one ROS pulse without changing focus."""
+        if (self.mode != 'flight' or not self.guard.armed or
+                self.guard.landing_latched or self.trial_release_sent or
+                self.last_upstream_peer is None):
+            self.log('trial_release', accepted=False)
+            return False
+        packet = json.dumps({'version': 2, 'kind': 'trial_release',
+                             'session_id': self.flight_session_id,
+                             'fake': self.rehearsal},
+                            separators=(',', ':')).encode('utf-8')
+        try:
+            sent = sock.sendto(packet, self.last_upstream_peer)
+            if sent != len(packet):
+                raise OSError('Incomplete trial release send')
+        except OSError:
+            self.log('trial_release', accepted=False, error='OS_SEND_ERROR')
+            self.abort('trial_release_link_error')
+            return False
+        self.trial_release_sent = True
+        self.log('trial_release', accepted=True)
+        return True
 
     def bench_pulse(self, axis):
         """Emit one allowlisted capped axis packet immediately followed by neutral."""
@@ -295,8 +380,6 @@ class RealGateway(FakeGateway):
         except OSError:
             self.log('state_link_error')
             self.arbiter.transport_fault(mono_ns, 'STATE_LINK_FAULT')
-        if self.mode == 'flight' and self.guard.armed:
-            self.guard.heartbeat(mono_ns)
         before = self.guard.land_attempts
         self.arbiter.tick(ros_ns, mono_ns)
         self.log_land_attempt(before)
@@ -320,11 +403,25 @@ class RealGateway(FakeGateway):
             self.closed = True
 
 
+class SimulatedStateFeed:
+    """Fresh synthetic state for a socket-free flight protocol rehearsal."""
+
+    def start(self):
+        pass
+
+    def read(self, mono_ns):
+        return Telemetry(mono_ns, 80.0, 70.0)
+
+    def close(self):
+        pass
+
+
 def main(argv=None):
     """Run the focused Tk operator surface and bounded UDP listener."""
     parser = argparse.ArgumentParser(
         description='Windows Tello gateway; FAKE is the default')
-    parser.add_argument('--mode', choices=('fake', 'grounded-bench', 'flight'),
+    parser.add_argument('--mode', choices=('fake', 'grounded-bench', 'flight',
+                                           'flight-dry-run'),
                         default='fake')
     parser.add_argument('--bind', required=True,
                         help='Explicit Windows IPv4 decision-listener bind address')
@@ -339,11 +436,17 @@ def main(argv=None):
     parser.add_argument('--propellers-installed', action='store_true')
     parser.add_argument('--aircraft-grounded', action='store_true')
     parser.add_argument('--pilot-present', action='store_true')
+    parser.add_argument('--flight-session-id',
+                        help='Fresh 32-character hex ID shared with the ROS forwarder')
+    parser.add_argument('--upstream-ip',
+                        help='Only accept flight decisions and leases from this IPv4')
+    parser.add_argument('--flight-source-frame-id',
+                        help='Only accept nonzero flight decisions from this frame ID')
     args = parser.parse_args(argv)
     socket.inet_aton(args.bind)
     if not 1 <= args.port <= 65535:
         parser.error('port must be in [1,65535]')
-    real = args.mode != 'fake'
+    real = args.mode in ('grounded-bench', 'flight')
     assertions = (args.propellers_removed, args.propellers_installed,
                   args.aircraft_grounded, args.pilot_present, args.tello_bind)
     if not real and (args.hardware or any(assertions)):
@@ -352,16 +455,28 @@ def main(argv=None):
         parser.error('Real modes require --hardware --tello-bind --pilot-present')
     if args.tello_bind:
         socket.inet_aton(args.tello_bind)
+    if args.upstream_ip:
+        socket.inet_aton(args.upstream_ip)
     if args.mode == 'grounded-bench':
         if (not args.propellers_removed or args.propellers_installed or
-                not args.aircraft_grounded):
+                not args.aircraft_grounded or args.flight_session_id or args.upstream_ip or
+                args.flight_source_frame_id):
             parser.error('grounded-bench requires --propellers-removed '
                          '--aircraft-grounded and rejects --propellers-installed')
+    if args.mode in ('flight', 'flight-dry-run'):
+        if (not args.upstream_ip or not valid_session_id(args.flight_session_id)
+                or args.flight_source_frame_id !=
+                'supervised_lateral_trial_' + args.flight_session_id):
+            parser.error('Flight session requires --upstream-ip, '
+                         '--flight-session-id and matching trial frame ID')
     if args.mode == 'flight':
         if (not args.propellers_installed or args.propellers_removed or
                 args.aircraft_grounded):
             parser.error('flight requires --propellers-installed and rejects '
                          'grounded/propellers-removed assertions')
+    if args.mode == 'fake' and (args.flight_session_id or args.upstream_ip or
+                                args.flight_source_frame_id):
+        parser.error('FAKE mode cannot accept flight session arguments')
     import tkinter as tk
 
     owner = OwnerLock(args.mode + '-windows-gateway:' + args.bind + ':' + str(args.port))
@@ -376,16 +491,25 @@ def main(argv=None):
         sock.bind((args.bind, args.port))
         if args.mode == 'fake':
             gateway = FakeGateway()
+        elif args.mode == 'flight-dry-run':
+            gateway = RealGateway(
+                'flight', FakeTransport(), SimulatedStateFeed(),
+                flight_session_id=args.flight_session_id,
+                flight_source_frame_id=args.flight_source_frame_id)
+            gateway.rehearsal = True
         else:
             gateway = RealGateway(
                 args.mode,
                 UdpSdkTransport(bind=args.tello_bind, local_port=8889),
-                StateReceiver('192.168.10.1', bind=args.tello_bind))
+                StateReceiver('192.168.10.1', bind=args.tello_bind),
+                flight_session_id=args.flight_session_id,
+                flight_source_frame_id=args.flight_source_frame_id)
         root = tk.Tk()
         root.title(('FAKE' if args.mode == 'fake' else args.mode.upper())
                    + ' Tello gateway — Space abort')
         status = tk.StringVar(
-            value=(args.mode.upper() +
+            value=(('FAKE FLIGHT REHEARSAL' if args.mode == 'flight-dry-run'
+                    else args.mode.upper()) +
                    (' — 60 s limit; Space aborts' if args.mode == 'grounded-bench'
                     else ' DISABLED — focus this window for Space')))
         tk.Label(root, textvariable=status, width=72, pady=18).pack()
@@ -409,10 +533,14 @@ def main(argv=None):
                 for axis in RealGateway.BENCH_AXES)
         else:
             buttons = (
-                tk.Button(root, text='Pilot confirms hover',
+                tk.Button(root, text=('Confirm FAKE hover' if
+                                      args.mode == 'flight-dry-run'
+                                      else 'Pilot confirms hover'),
                           command=gateway.confirm_hover),
                 tk.Button(root, text='Arm flight session',
                           command=gateway.arm_flight),
+                tk.Button(root, text='Release ONE ROS lateral pulse',
+                          command=lambda: gateway.release_trial(sock)),
             )
         for button in buttons:
             button.pack()
@@ -429,14 +557,17 @@ def main(argv=None):
 
         def loop():
             # Bound work per UI turn; never wait on ROS or an SDK reply.
-            latest = None
             for _ in range(32):
                 try:
-                    latest, _peer = sock.recvfrom(1024)
+                    data, peer = sock.recvfrom(1024)
                 except BlockingIOError:
                     break
-            if latest is not None:
-                gateway.receive(latest)
+                if args.mode in ('flight', 'flight-dry-run') and peer[0] != args.upstream_ip:
+                    gateway.log('upstream_peer_rejected', address=peer[0])
+                    continue
+                accepted = gateway.receive(data)
+                if (accepted and args.mode in ('flight', 'flight-dry-run')):
+                    gateway.last_upstream_peer = peer
             gateway.tick()
             if (args.mode == 'grounded-bench' and
                     gateway.bench_session_expired):
@@ -477,7 +608,10 @@ def main(argv=None):
                 'pilot_hover_confirmation', 'bench_pulse',
             }
             with open(args.trace, 'x', encoding='utf-8') as output:
-                json.dump({'fake': args.mode == 'fake', 'mode': args.mode,
+                json.dump({'fake': args.mode in ('fake', 'flight-dry-run'),
+                           'mode': args.mode,
+                           'flight_session_id': args.flight_session_id,
+                           'flight_source_frame_id': args.flight_source_frame_id,
                            'grounded_bench_session': ({
                                'started_ns': gateway.bench_started_ns,
                                'maximum_duration_ns':

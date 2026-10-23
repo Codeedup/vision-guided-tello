@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <string>
 
 #include "rclcpp/rclcpp.hpp"
 #include "drone_interfaces/msg/candidate_command.hpp"
@@ -19,6 +20,10 @@ public:
   MissionManager()
   : Node("mission_manager")
   {
+    rcl_interfaces::msg::ParameterDescriptor source_descriptor;
+    source_descriptor.read_only = true;
+    required_candidate_frame_id_ = declare_parameter<std::string>(
+      "required_candidate_frame_id", "", source_descriptor);
     approved_publisher_ = create_publisher<Approved>(
              "approved_command", rclcpp::QoS(1));
     subscription_ = create_subscription<Candidate>(
@@ -125,6 +130,7 @@ private:
   bool have_candidate_{false};
   bool candidate_usable_{false};
   std::int64_t last_accepted_stamp_ns_{0};
+  std::string required_candidate_frame_id_;
 
 
   void clear_input()
@@ -286,6 +292,14 @@ private:
   {
         // A late observation cannot cancel an already-due landing.
     update_safety();
+
+    if (!required_candidate_frame_id_.empty() &&
+      message->header.frame_id != required_candidate_frame_id_)
+    {
+      reject_candidate();
+      RCLCPP_WARN(get_logger(), "Rejected candidate from unexpected source frame.");
+      return;
+    }
 
     const auto & stamp = message->header.stamp;
 
