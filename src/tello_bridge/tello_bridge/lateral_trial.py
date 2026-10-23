@@ -121,7 +121,8 @@ def main(argv=None):
         release['received'] = True
         release['fake'] = msg.data
 
-    node.create_subscription(Bool, 'flight_pilot_release', on_release, 1)
+    release_subscription = node.create_subscription(
+        Bool, 'flight_pilot_release', on_release, 1)
     approved = {'last': None, 'receipt_ns': None, 'nonzero_count': 0, 'fault': None}
     report = {'flight_session_id': args.flight_session_id,
               'source_frame_id': frame_id, 'requested_lateral': args.lateral,
@@ -184,6 +185,9 @@ def main(argv=None):
                 predicate(msg))
 
     try:
+        wait_for(node, lambda: publisher.get_subscription_count() == 1 and
+                 lease_publisher.get_subscription_count() == 1 and
+                 release_subscription.get_publisher_count() == 1, 5.0)
         call_autonomy(False)
         wait_for(node, lambda: recent_approved(
             lambda msg: not msg.autonomy_enabled and not msg.tracking_allowed and

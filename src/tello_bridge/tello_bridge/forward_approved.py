@@ -128,6 +128,7 @@ def main(argv=None):
                 except (UnicodeError, ValueError, TypeError, KeyError):
                     node.get_logger().warning('Trial release rejected')
                     continue
+                node.get_logger().info('Trial release accepted')
                 release_publisher.publish(Bool(data=fake))
 
         node.create_timer(0.02, poll_release)

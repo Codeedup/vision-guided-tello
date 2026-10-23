@@ -63,15 +63,16 @@ class TestFlightRosPath(unittest.TestCase):
                                                     'candidate_command', 1)
         self.lease = self.node.create_publisher(Empty, 'flight_operator_lease', 1)
         self.releases = 0
-        self.node.create_subscription(Bool, 'flight_pilot_release',
-                                      self.on_release, 1)
+        self.release_subscription = self.node.create_subscription(
+            Bool, 'flight_pilot_release', self.on_release, 1)
         self.autonomy = self.node.create_client(SetBool, 'mission_manager/set_autonomy')
         self.gateway = RealGateway('flight', FakeTransport(), FreshState(),
                                    SESSION, FRAME)
         self.addCleanup(self.gateway.close)
         self.wait(lambda: self.autonomy.service_is_ready() and
                   self.candidate.get_subscription_count() == 1 and
-                  self.lease.get_subscription_count() == 1, 5.0)
+                  self.lease.get_subscription_count() == 1 and
+                  self.release_subscription.get_publisher_count() == 1, 5.0)
 
     def pump(self, seconds=0.02):
         deadline = time.monotonic() + seconds
